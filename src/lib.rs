@@ -96,3 +96,20 @@ impl ArrayImpl {
         dst[dstIndex..][..length].copy_from_slice(&source[sourceIndex..][..length]);
     }
 }
+
+#[derive(Debug)]
+pub struct InflateResult {
+    /// The number of bytes consumed from the input slice.
+    pub bytes_consumed: usize,
+    /// The number of bytes written to the output slice.
+    pub bytes_written: usize,
+}
+
+impl InflateResult {
+    pub fn new() -> Self {
+        Self {
+            bytes_consumed: 0,
+            bytes_written: 0,
+        }
+    }
+}

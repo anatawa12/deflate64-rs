@@ -1,7 +1,7 @@
 use std::cmp::min;
 use crate::*;
 use crate::HuffmanTree::HuffmanTree;
-use crate::InputBuffer::InputBuffer;
+use crate::InputBuffer::{BitsBuffer, InputBuffer};
 use crate::OutputWindow::OutputWindow;
 
 // Extra bits for length code 257 - 285.
@@ -34,9 +34,9 @@ static StaticDistanceTreeTable: &'static [u8] = &[
 ];
 
 
-pub(crate) struct InflaterManaged<'a> {
+pub(crate) struct InflaterManaged {
     _output: /*readonly*/ OutputWindow,
-    _input: /*readonly*/ InputBuffer<'a>,
+    _bits: /*readonly*/ BitsBuffer,
     _literalLengthTree: Option<HuffmanTree>,
     _distanceTree: Option<HuffmanTree>,
 
@@ -68,11 +68,11 @@ pub(crate) struct InflaterManaged<'a> {
     _currentInflatedCount: usize,
 }
 
-impl<'a> InflaterManaged<'a> {
+impl InflaterManaged {
     fn new(deflate64: bool, uncompressedSize: usize) -> Self {
         Self {
             _output: OutputWindow::new(),
-            _input: InputBuffer::new(),
+            _bits: BitsBuffer::new(),
 
             _literalLengthTree: None,
             _codeList: [0u8; HuffmanTree::MaxLiteralTreeElements + HuffmanTree::MaxDistTreeElements],
@@ -99,10 +99,6 @@ impl<'a> InflaterManaged<'a> {
         }
     }
 
-    pub fn SetInput(&mut self, inputBytes: &'a [u8]) {
-        self._input.SetInput(inputBytes);
-    }
-
     pub fn Finished(&self) -> bool {
         self._state == InflaterState::Done || self._state == InflaterState::VerifyingFooter
     }
@@ -111,11 +107,12 @@ impl<'a> InflaterManaged<'a> {
         self._output.AvailableBytes()
     }
 
-    pub fn Inflate(&mut self, mut bytes: &mut [u8]) -> usize {
+    pub fn Inflate(&mut self, inputBytes: &[u8], mut bytes: &mut [u8]) -> InflateResult {
         // copy bytes from output to outputbytes if we have available bytes
         // if buffer is not filled up. keep decoding until no input are available
         // if decodeBlock returns false. Throw an exception.
-        let mut count = 0;
+        let mut result = InflateResult::new();
+        let mut input = InputBuffer::new(self._bits, inputBytes);
         while
         {
             let mut copied = 0;
@@ -137,23 +134,26 @@ impl<'a> InflaterManaged<'a> {
             if (copied > 0)
             {
                 bytes = &mut bytes[copied..];
-                count += copied;
+                result.bytes_written += copied;
             }
 
             if (bytes.is_empty())
             {
                 // filled in the bytes buffer
                 //break;
-                return count;
+                false
+            } else {
+                // Decode will return false when more input is needed
+                !self.Finished() && self.Decode(&mut input)
             }
-            // Decode will return false when more input is needed
-            !self.Finished() && self.Decode()
         } {};
 
-        return count;
+        self._bits = input.bits;
+        result.bytes_consumed = input.read_bytes;
+        return result;
     }
 
-    fn Decode(&mut self) -> bool {
+    fn Decode(&mut self, input: &mut InputBuffer) -> bool {
         let mut eob = false;
         let mut result;
 
@@ -166,24 +166,24 @@ impl<'a> InflaterManaged<'a> {
         {
             // reading bfinal bit
             // Need 1 bit
-            if (!self._input.EnsureBitsAvailable(1)) {
+            if (!input.EnsureBitsAvailable(1)) {
                 return false;
             }
 
-            self._bfinal = self._input.GetBits(1);
+            self._bfinal = input.GetBits(1);
             self._state = InflaterState::ReadingBType;
         }
 
         if (self._state == InflaterState::ReadingBType)
         {
             // Need 2 bits
-            if (!self._input.EnsureBitsAvailable(2))
+            if (!input.EnsureBitsAvailable(2))
             {
                 self._state = InflaterState::ReadingBType;
                 return false;
             }
 
-            self._blockType = BlockType::from_int(self._input.GetBits(2)).expect("UnknownBlockType");
+            self._blockType = BlockType::from_int(input.GetBits(2)).expect("UnknownBlockType");
             match self._blockType {
                 BlockType::Dynamic => {
                     self._state = InflaterState::ReadingNumLitCodes;
@@ -204,20 +204,20 @@ impl<'a> InflaterManaged<'a> {
             if self._state < InflaterState::DecodeTop
             {
                 // we are reading the header
-                result = self.DecodeDynamicBlockHeader();
+                result = self.DecodeDynamicBlockHeader(input);
             }
             else
             {
-                result = self.DecodeBlock(&mut eob); // this can returns true when output is full
+                result = self.DecodeBlock(input, &mut eob); // this can returns true when output is full
             }
         }
         else if (self._blockType == BlockType::Static)
         {
-            result = self.DecodeBlock(&mut eob);
+            result = self.DecodeBlock(input, &mut eob);
         }
         else if (self._blockType == BlockType::Uncompressed)
         {
-            result = self.DecodeUncompressedBlock(&mut eob);
+            result = self.DecodeUncompressedBlock(input, &mut eob);
         }
         else
         {
@@ -235,13 +235,13 @@ impl<'a> InflaterManaged<'a> {
         return result;
     }
 
-    fn DecodeUncompressedBlock(&mut self, end_of_block: &mut bool) -> bool {
+    fn DecodeUncompressedBlock(&mut self, input: &mut InputBuffer, end_of_block: &mut bool) -> bool {
         *end_of_block = false;
         loop
         {
             match self._state {
                 InflaterState::UncompressedAligning => {
-                    self._input.SkipToByteBoundary();
+                    input.SkipToByteBoundary();
                     self._state = InflaterState::UncompressedByte1;
                     continue; //goto case InflaterState.UncompressedByte1; 
                 }
@@ -250,7 +250,7 @@ impl<'a> InflaterManaged<'a> {
                 | InflaterState::UncompressedByte3
                 | InflaterState::UncompressedByte4
                 => {
-                    let bits = self._input.GetBits(8);
+                    let bits = input.GetBits(8);
                     if (bits < 0)
                     {
                         return false;
@@ -279,7 +279,7 @@ impl<'a> InflaterManaged<'a> {
                 }
                 InflaterState::DecodingUncompressed => {
                     // Directly copy bytes from input to output.
-                    let bytesCopied = self._output.CopyFrom(&mut self._input, self._blockLength);
+                    let bytesCopied = self._output.CopyFrom(input, self._blockLength);
                     self._blockLength -= bytesCopied;
 
                     if (self._blockLength == 0)
@@ -307,7 +307,7 @@ impl<'a> InflaterManaged<'a> {
         }
     }
 
-    fn DecodeBlock(&mut self, end_of_block_code_seen: &mut bool) -> bool {
+    fn DecodeBlock(&mut self, input: &mut InputBuffer, end_of_block_code_seen: &mut bool) -> bool {
         *end_of_block_code_seen = false;
 
         let mut freeBytes = self._output.FreeBytes();   // it is a little bit faster than frequently accessing the property
@@ -322,7 +322,7 @@ impl<'a> InflaterManaged<'a> {
                     // decode an element from the literal tree
 
                     // TODO: optimize this!!!
-                    symbol = self._literalLengthTree.as_mut().unwrap().GetNextSymbol(&mut self._input);
+                    symbol = self._literalLengthTree.as_mut().unwrap().GetNextSymbol(input);
                     if (symbol < 0)
                     {
                         // running out of input
@@ -377,7 +377,7 @@ impl<'a> InflaterManaged<'a> {
                     if (self._extraBits > 0)
                     {
                         self._state = InflaterState::HaveInitialLength;
-                        let bits = self._input.GetBits(self._extraBits);
+                        let bits = input.GetBits(self._extraBits);
                         if (bits < 0)
                         {
                             return false;
@@ -396,12 +396,12 @@ impl<'a> InflaterManaged<'a> {
                 InflaterState::HaveFullLength => {
                     if (self._blockType == BlockType::Dynamic)
                     {
-                        self._distanceCode = self._distanceTree.as_mut().unwrap().GetNextSymbol(&mut self._input);
+                        self._distanceCode = self._distanceTree.as_mut().unwrap().GetNextSymbol(input);
                     }
                     else
                     {
                         // get distance code directly for static block
-                        self._distanceCode = self._input.GetBits(5) as i32;
+                        self._distanceCode = input.GetBits(5);
                         if (self._distanceCode >= 0)
                         {
                             self._distanceCode = StaticDistanceTreeTable[self._distanceCode as usize] as i32;
@@ -425,7 +425,7 @@ impl<'a> InflaterManaged<'a> {
                     if (self._distanceCode > 3)
                     {
                         self._extraBits = (self._distanceCode - 2) >> 1;
-                        let bits = self._input.GetBits(self._extraBits);
+                        let bits = input.GetBits(self._extraBits);
                         if (bits < 0)
                         {
                             return false;
@@ -475,11 +475,11 @@ impl<'a> InflaterManaged<'a> {
     // The code length repeat codes can cross from HLIT + 257 to the
     // HDIST + 1 code lengths.  In other words, all code lengths form
     // a single sequence of HLIT + HDIST + 258 values.
-    fn DecodeDynamicBlockHeader(&mut self) -> bool {
+    fn DecodeDynamicBlockHeader(&mut self, input: &mut InputBuffer) -> bool {
         'switch: loop {
             match self._state {
                 InflaterState::ReadingNumLitCodes => {
-                    self._literalLengthCodeCount = self._input.GetBits(5);
+                    self._literalLengthCodeCount = input.GetBits(5);
                     if (self._literalLengthCodeCount < 0)
                     {
                         return false;
@@ -489,7 +489,7 @@ impl<'a> InflaterManaged<'a> {
                     continue 'switch //goto case InflaterState::ReadingNumDistCodes;
                 }
                 InflaterState::ReadingNumDistCodes => {
-                    self._distanceCodeCount = self._input.GetBits(5);
+                    self._distanceCodeCount = input.GetBits(5);
                     if (self._distanceCodeCount < 0)
                     {
                         return false;
@@ -499,7 +499,7 @@ impl<'a> InflaterManaged<'a> {
                     continue 'switch // goto case InflaterState::ReadingNumCodeLengthCodes;
                 }
                 InflaterState::ReadingNumCodeLengthCodes => {
-                    self._codeLengthCodeCount = self._input.GetBits(4);
+                    self._codeLengthCodeCount = input.GetBits(4);
                     if (self._codeLengthCodeCount < 0)
                     {
                         return false;
@@ -512,7 +512,7 @@ impl<'a> InflaterManaged<'a> {
                 InflaterState::ReadingCodeLengthCodes => {
                     while (self._loopCounter < self._codeLengthCodeCount)
                     {
-                        let bits = self._input.GetBits(3);
+                        let bits = input.GetBits(3);
                         if (bits < 0)
                         {
                             return false;
@@ -539,7 +539,7 @@ impl<'a> InflaterManaged<'a> {
                     {
                         if (self._state == InflaterState::ReadingTreeCodesBefore)
                         {
-                            self._lengthCode = self._codeLengthTree.as_mut().unwrap().GetNextSymbol(&mut self._input);
+                            self._lengthCode = self._codeLengthTree.as_mut().unwrap().GetNextSymbol(input);
                             if (self._lengthCode < 0)
                             {
                                 return false;
@@ -566,7 +566,7 @@ impl<'a> InflaterManaged<'a> {
                             let mut repeatCount;
                             if (self._lengthCode == 16)
                             {
-                                if (!self._input.EnsureBitsAvailable(2))
+                                if (!input.EnsureBitsAvailable(2))
                                 {
                                     self._state = InflaterState::ReadingTreeCodesAfter;
                                     return false;
@@ -580,7 +580,7 @@ impl<'a> InflaterManaged<'a> {
                                 }
 
                                 let previousCode = self._codeList[self._loopCounter as usize - 1];
-                                repeatCount = self._input.GetBits(2) + 3;
+                                repeatCount = input.GetBits(2) + 3;
 
                                 if (self._loopCounter + repeatCount > self._codeArraySize)
                                 {
@@ -594,13 +594,13 @@ impl<'a> InflaterManaged<'a> {
                                 }
                             } else if (self._lengthCode == 17)
                             {
-                                if (!self._input.EnsureBitsAvailable(3))
+                                if (!input.EnsureBitsAvailable(3))
                                 {
                                     self._state = InflaterState::ReadingTreeCodesAfter;
                                     return false;
                                 }
 
-                                repeatCount = self._input.GetBits(3) + 3;
+                                repeatCount = input.GetBits(3) + 3;
 
                                 if (self._loopCounter + repeatCount > self._codeArraySize)
                                 {
@@ -614,13 +614,13 @@ impl<'a> InflaterManaged<'a> {
                                 }
                             } else {
                                 // code == 18
-                                if (!self._input.EnsureBitsAvailable(7))
+                                if (!input.EnsureBitsAvailable(7))
                                 {
                                     self._state = InflaterState::ReadingTreeCodesAfter;
                                     return false;
                                 }
 
-                                repeatCount = self._input.GetBits(7) + 11;
+                                repeatCount = input.GetBits(7) + 11;
 
                                 if (self._loopCounter + repeatCount > self._codeArraySize)
                                 {
@@ -686,9 +686,9 @@ mod test {
         assert_eq!(BINARY_WAV_DATA.len(), uncompressed_size);
 
         let mut inflater = Box::new(InflaterManaged::new(true, uncompressed_size));
-        inflater.SetInput(compressed_data);
-        let output = inflater.Inflate(&mut uncompressed_data);
-        assert_eq!(output, uncompressed_size);
+        let output = inflater.Inflate(compressed_data, &mut uncompressed_data);
+        assert_eq!(output.bytes_consumed, compressed_size);
+        assert_eq!(output.bytes_written, uncompressed_size);
 
         assert_eq!(uncompressed_data, BINARY_WAV_DATA);
     }
