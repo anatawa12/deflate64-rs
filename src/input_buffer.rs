@@ -1,4 +1,5 @@
 use std::cmp::min;
+use crate::DataNeeded;
 
 #[derive(Copy, Clone)]
 pub(crate) struct BitsBuffer {
@@ -98,18 +99,18 @@ impl<'a> InputBuffer<'a> {
         (1 << count) - 1
     }
 
-    pub fn get_bits(&mut self, count: i32) -> i32 {
+    pub fn get_bits(&mut self, count: i32) -> Result<u16, DataNeeded> {
         debug_assert!(0 < count && count <= 16, "count is invalid.");
 
         if !self.ensure_bits_available(count)
         {
-            return -1;
+            return Err(DataNeeded);
         }
 
-        let result = (self.bits.bit_buffer & self.get_bit_mask(count)) as i32;
+        let result = (self.bits.bit_buffer & self.get_bit_mask(count)) as u16;
         self.bits.bit_buffer >>= count;
         self.bits.bits_in_buffer -= count;
-        return result;
+        return Ok(result);
     }
 
     pub fn copy_to(&mut self, mut output: &mut [u8]) -> usize {

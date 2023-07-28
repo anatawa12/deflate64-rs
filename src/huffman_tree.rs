@@ -1,3 +1,4 @@
+use crate::DataNeeded;
 use crate::input_buffer::InputBuffer;
 
 pub(crate) struct HuffmanTree {
@@ -236,19 +237,18 @@ impl HuffmanTree {
         }
     }
 
-    pub fn get_next_symbol(&mut self, input: &mut InputBuffer) -> i32 {
-
+    pub fn get_next_symbol(&mut self, input: &mut InputBuffer) -> Result<u16, DataNeeded> {
         // Try to load 16 bits into input buffer if possible and get the bit_buffer value.
         // If there aren't 16 bits available we will return all we have in the
         // input buffer.
         let bit_buffer = input.try_load_16bits();
         if input.available_bits() == 0
         {    // running out of input.
-            return -1;
+            return Err(DataNeeded);
         }
 
         // decode an element
-        let mut symbol = self.table[bit_buffer as usize & self.table_mask as usize] as i32;
+        let mut symbol = self.table[bit_buffer as usize & self.table_mask as usize];
         if symbol < 0
         {       //  this will be the start of the binary tree
             // navigate the tree
@@ -257,15 +257,17 @@ impl HuffmanTree {
             {
                 symbol = -symbol;
                 if (bit_buffer & mask) == 0 {
-                    symbol = self.left[symbol as usize] as i32;
+                    symbol = self.left[symbol as usize];
                 }
                 else {
-                    symbol = self.right[symbol as usize] as i32;
+                    symbol = self.right[symbol as usize];
                 }
                 mask <<= 1;
                 symbol < 0
             } {};
         }
+
+        debug_assert!(symbol >= 0);
 
         let code_length = self.code_length_array[symbol as usize] as i32;
 
@@ -284,10 +286,10 @@ impl HuffmanTree {
         {
             // We already tried to load 16 bits and maximum length is 15,
             // so this means we are running out of input.
-            return -1;
+            return Err(DataNeeded);
         }
 
         input.skip_bits(code_length);
-        return symbol;
+        return Ok(symbol as u16);
     }
 }

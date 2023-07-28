@@ -12,7 +12,7 @@ enum BlockType
 }
 
 impl BlockType {
-    pub fn from_int(int: i32) -> Option<BlockType> {
+    pub fn from_int(int: u16) -> Option<BlockType> {
         match int {
             0 => Some(Self::Uncompressed),
             1 => Some(Self::Static),
@@ -100,3 +100,5 @@ impl InflateResult {
         }
     }
 }
+
+struct DataNeeded;
