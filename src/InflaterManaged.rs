@@ -635,8 +635,8 @@ impl<'a> InflaterManaged<'a> {
                             }
                         }
                         self._state = InflaterState::ReadingTreeCodesBefore; // we want to read the next code.
-                        break 'switch
                     }
+                    break 'switch
                 }
                 _ => {
                     panic!("InvalidDataException: UnknownState");

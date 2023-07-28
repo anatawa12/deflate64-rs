@@ -50,15 +50,23 @@ impl OutputWindow {
         // move backwards distance bytes in the output stream,
         // and copy length bytes from this position to the output stream.
         self._bytesUsed += length;
-        let mut copyStart = (self._end - distance) & WindowMask; // start position for coping.
+        let mut copyStart = (self._end.overflowing_sub(distance).0) & WindowMask; // start position for coping.
 
         let border = WindowSize - length;
         if (copyStart <= border && self._end < border)
         {
             if (length <= distance)
             {
-                let (a, b) = self._window.split_at_mut(self._end);
-                b[..length].copy_from_slice(&a[copyStart..][..length]);
+                // src, srcIdx, dst, dstIdx, len
+                // Array.Copy(self._window, copyStart, self._window, self._end, length);
+                unsafe {
+                    // src, dst, cnt
+                    std::ptr::copy(
+                        self._window.as_ptr().add(copyStart),
+                        self._window.as_mut_ptr().add(self._end),
+                        length
+                    )
+                }
                 self._end += length;
             } else {
                 // The referenced string may overlap the current
@@ -72,7 +80,6 @@ impl OutputWindow {
                     self._end += 1;
                     copyStart += 1;
                 }
-                length -= 1;
             }
         } else {
             // copy byte by byte
@@ -85,7 +92,6 @@ impl OutputWindow {
                 self._end &= WindowMask;
                 copyStart &= WindowMask;
             }
-            length -= 1;
         }
     }
 
@@ -145,9 +151,9 @@ impl OutputWindow {
 
         let copied = output.len();
 
-        let tailLen = output.len() - copy_end;
-        if (tailLen > 0)
+        if (output.len() > copy_end)
         {
+            let tailLen = output.len() - copy_end;
             // this means we need to copy two parts separately
             // copy the taillen bytes from the end of the output window
             output[..tailLen].copy_from_slice(&self._window[WindowSize - tailLen..][..tailLen]);

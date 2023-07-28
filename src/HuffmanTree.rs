@@ -49,8 +49,8 @@ impl HuffmanTree {
         // I need to find proof that left and right array will always be
         // enough. I think they are.
 
-        let _left = vec![0i16; 1 << _codeLengthArray.len()].into_boxed_slice();
-        let _right = vec![0i16; 1 << _codeLengthArray.len()].into_boxed_slice();
+        let _left = vec![0i16; 2 * _codeLengthArray.len()].into_boxed_slice();
+        let _right = vec![0i16; 2 * _codeLengthArray.len()].into_boxed_slice();
 
         let mut instance = Self {
             _tableBits,
@@ -215,18 +215,17 @@ impl HuffmanTree {
 
                         if ((start & codeBitMask) == 0)
                         {
-                        // if current bit is 0, go change the left array
-                        array = &mut self._left;
+                            // if current bit is 0, go change the left array
+                            array = &mut self._left;
                         }
-                        else
-                        {
-                        // if current bit is 1, set value in the right array
-                        array = &mut self._right;
+                        else {
+                            // if current bit is 1, set value in the right array
+                            array = &mut self._right;
                         }
                         index = -value as usize; // go to next node
 
                         codeBitMask <<= 1;
-                        overflowBits += 1;
+                        overflowBits -= 1;
 
                         overflowBits != 0
                     } {};
