@@ -1,33 +1,33 @@
 use std::cmp::min;
 use crate::*;
-use crate::HuffmanTree::HuffmanTree;
-use crate::InputBuffer::{BitsBuffer, InputBuffer};
-use crate::OutputWindow::OutputWindow;
+use crate::huffman_tree::HuffmanTree;
+use crate::input_buffer::{BitsBuffer, InputBuffer};
+use crate::output_window::OutputWindow;
 
 // Extra bits for length code 257 - 285.
-static ExtraLengthBits: &'static [u8] = &[
+static EXTRA_LENGTH_BITS: &'static [u8] = &[
 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3,
 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 16
 ];
 
 // The base length for length code 257 - 285.
 // The formula to get the real length for a length code is lengthBase[code - 257] + (value stored in extraBits)
-static LengthBase: &'static [u8] = &[
+static LENGTH_BASE: &'static [u8] = &[
 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51,
 59, 67, 83, 99, 115, 131, 163, 195, 227, 3
 ];
 
 // The base distance for distance code 0 - 31
 // The real distance for a distance code is  distanceBasePosition[code] + (value stored in extraBits)
-static DistanceBasePosition: &'static [u16] = &[
+static DISTANCE_BASE_POSITION: &'static [u16] = &[
 1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513,
 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577, 32769, 49153
 ];
 
 // code lengths for code length alphabet is stored in following order
-static CodeOrder: &'static [u8] = &[16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 ];
+static CODE_ORDER: &'static [u8] = &[16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 ];
 
-static StaticDistanceTreeTable: &'static [u8] = &[
+static STATIC_DISTANCE_TREE_TABLE: &'static [u8] = &[
 0x00, 0x10, 0x08, 0x18, 0x04, 0x14, 0x0c, 0x1c, 0x02, 0x12, 0x0a, 0x1a,
 0x06, 0x16, 0x0e, 0x1e, 0x01, 0x11, 0x09, 0x19, 0x05, 0x15, 0x0d, 0x1d,
 0x03, 0x13, 0x0b, 0x1b, 0x07, 0x17, 0x0f, 0x1f
@@ -35,189 +35,190 @@ static StaticDistanceTreeTable: &'static [u8] = &[
 
 
 pub(crate) struct InflaterManaged {
-    _output: /*readonly*/ OutputWindow,
-    _bits: /*readonly*/ BitsBuffer,
-    _literalLengthTree: Option<HuffmanTree>,
-    _distanceTree: Option<HuffmanTree>,
+    output: /*readonly*/ OutputWindow,
+    bits: /*readonly*/ BitsBuffer,
+    literal_length_tree: Option<HuffmanTree>,
+    distance_tree: Option<HuffmanTree>,
 
-    _state: InflaterState,
-    _bfinal: i32,
-    _blockType: BlockType,
+    state: InflaterState,
+    bfinal: i32,
+    block_type: BlockType,
 
     // uncompressed block
-    _blockLengthBuffer: [u8; 4],
-    _blockLength: usize,
+    block_length_buffer: [u8; 4],
+    block_length: usize,
 
     // compressed block
-    _length: usize,
-    _distanceCode: i32,
-    _extraBits: i32,
+    length: usize,
+    distance_code: i32,
+    extra_bits: i32,
 
-    _loopCounter: i32,
-    _literalLengthCodeCount: i32,
-    _distanceCodeCount: i32,
-    _codeLengthCodeCount: i32,
-    _codeArraySize: i32,
-    _lengthCode: i32,
+    loop_counter: i32,
+    literal_length_code_count: i32,
+    distance_code_count: i32,
+    code_length_code_count: i32,
+    code_array_size: i32,
+    length_code: i32,
 
-    _codeList: [u8; HuffmanTree::MaxLiteralTreeElements + HuffmanTree::MaxDistTreeElements],// temporary array to store the code length for literal/Length and distance
-    _codeLengthTreeCodeLength: [u8; HuffmanTree::NumberOfCodeLengthTreeElements],
-    _deflate64: bool,
-    _codeLengthTree: Option<HuffmanTree>,
-    /*readonly*/_uncompressedSize: usize,
-    _currentInflatedCount: usize,
+    code_list: [u8; HuffmanTree::MAX_LITERAL_TREE_ELEMENTS + HuffmanTree::MAX_DIST_TREE_ELEMENTS],// temporary array to store the code length for literal/Length and distance
+    code_length_tree_code_length: [u8; HuffmanTree::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS],
+    deflate64: bool,
+    code_length_tree: Option<HuffmanTree>,
+    uncompressed_size: usize,
+    current_inflated_count: usize,
 }
 
 impl InflaterManaged {
-    fn new(deflate64: bool, uncompressedSize: usize) -> Self {
+    fn new(deflate64: bool, uncompressed_size: usize) -> Self {
         Self {
-            _output: OutputWindow::new(),
-            _bits: BitsBuffer::new(),
+            output: OutputWindow::new(),
+            bits: BitsBuffer::new(),
 
-            _literalLengthTree: None,
-            _codeList: [0u8; HuffmanTree::MaxLiteralTreeElements + HuffmanTree::MaxDistTreeElements],
-            _codeLengthTreeCodeLength: [0u8; HuffmanTree::NumberOfCodeLengthTreeElements],
-            _deflate64: deflate64,
-            _codeLengthTree: None,
-            _uncompressedSize: uncompressedSize,
-            _state: InflaterState::ReadingBFinal, // start by reading BFinal bit
-            _bfinal: 0,
-            _blockType: BlockType::Uncompressed,
-            _blockLengthBuffer: [0u8; 4],
-            _blockLength: 0,
-            _length: 0,
-            _distanceCode: 0,
-            _extraBits: 0,
-            _loopCounter: 0,
-            _literalLengthCodeCount: 0,
-            _distanceCodeCount: 0,
-            _codeLengthCodeCount: 0,
-            _codeArraySize: 0,
-            _distanceTree: None,
-            _lengthCode: 0,
-            _currentInflatedCount: 0,
+            literal_length_tree: None,
+            code_list: [0u8; HuffmanTree::MAX_LITERAL_TREE_ELEMENTS + HuffmanTree::MAX_DIST_TREE_ELEMENTS],
+            code_length_tree_code_length: [0u8; HuffmanTree::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS],
+            deflate64: deflate64,
+            code_length_tree: None,
+            uncompressed_size,
+            state: InflaterState::ReadingBFinal, // start by reading BFinal bit
+            bfinal: 0,
+            block_type: BlockType::Uncompressed,
+            block_length_buffer: [0u8; 4],
+            block_length: 0,
+            length: 0,
+            distance_code: 0,
+            extra_bits: 0,
+            loop_counter: 0,
+            literal_length_code_count: 0,
+            distance_code_count: 0,
+            code_length_code_count: 0,
+            code_array_size: 0,
+            distance_tree: None,
+            length_code: 0,
+            current_inflated_count: 0,
         }
     }
 
-    pub fn Finished(&self) -> bool {
-        self._state == InflaterState::Done || self._state == InflaterState::VerifyingFooter
+    pub fn finished(&self) -> bool {
+        self.state == InflaterState::Done
     }
 
-    pub fn AvailableOutput(&self) -> usize {
-        self._output.AvailableBytes()
+    #[allow(dead_code)]
+    pub fn available_output(&self) -> usize {
+        self.output.available_bytes()
     }
 
-    pub fn Inflate(&mut self, inputBytes: &[u8], mut bytes: &mut [u8]) -> InflateResult {
+    pub fn inflate(&mut self, input_bytes: &[u8], mut bytes: &mut [u8]) -> InflateResult {
         // copy bytes from output to outputbytes if we have available bytes
         // if buffer is not filled up. keep decoding until no input are available
         // if decodeBlock returns false. Throw an exception.
         let mut result = InflateResult::new();
-        let mut input = InputBuffer::new(self._bits, inputBytes);
+        let mut input = InputBuffer::new(self.bits, input_bytes);
         while
         {
             let mut copied = 0;
-            if (self._uncompressedSize == usize::MAX)
+            if self.uncompressed_size == usize::MAX
             {
-                copied = self._output.CopyTo(bytes);
+                copied = self.output.copy_to(bytes);
             } else {
-                if (self._uncompressedSize > self._currentInflatedCount)
+                if self.uncompressed_size > self.current_inflated_count
                 {
-                    let len = min(bytes.len(), (self._uncompressedSize - self._currentInflatedCount));
+                    let len = min(bytes.len(), self.uncompressed_size - self.current_inflated_count);
                     bytes = &mut bytes[..len];
-                    copied = self._output.CopyTo(bytes);
-                    self._currentInflatedCount += copied;
+                    copied = self.output.copy_to(bytes);
+                    self.current_inflated_count += copied;
                 } else {
-                    self._state = InflaterState::Done;
-                    self._output.ClearBytesUsed();
+                    self.state = InflaterState::Done;
+                    self.output.clear_bytes_used();
                 }
             }
-            if (copied > 0)
+            if copied > 0
             {
                 bytes = &mut bytes[copied..];
                 result.bytes_written += copied;
             }
 
-            if (bytes.is_empty())
+            if bytes.is_empty()
             {
                 // filled in the bytes buffer
                 //break;
                 false
             } else {
-                // Decode will return false when more input is needed
-                !self.Finished() && self.Decode(&mut input)
+                // decode will return false when more input is needed
+                !self.finished() && self.decode(&mut input)
             }
         } {};
 
-        self._bits = input.bits;
+        self.bits = input.bits;
         result.bytes_consumed = input.read_bytes;
         return result;
     }
 
-    fn Decode(&mut self, input: &mut InputBuffer) -> bool {
+    fn decode(&mut self, input: &mut InputBuffer) -> bool {
         let mut eob = false;
-        let mut result;
+        let result;
 
-        if (self.Finished())
+        if self.finished()
         {
             return true;
         }
 
-        if (self._state == InflaterState::ReadingBFinal)
+        if self.state == InflaterState::ReadingBFinal
         {
             // reading bfinal bit
             // Need 1 bit
-            if (!input.EnsureBitsAvailable(1)) {
+            if !input.ensure_bits_available(1) {
                 return false;
             }
 
-            self._bfinal = input.GetBits(1);
-            self._state = InflaterState::ReadingBType;
+            self.bfinal = input.get_bits(1);
+            self.state = InflaterState::ReadingBType;
         }
 
-        if (self._state == InflaterState::ReadingBType)
+        if self.state == InflaterState::ReadingBType
         {
             // Need 2 bits
-            if (!input.EnsureBitsAvailable(2))
+            if !input.ensure_bits_available(2)
             {
-                self._state = InflaterState::ReadingBType;
+                self.state = InflaterState::ReadingBType;
                 return false;
             }
 
-            self._blockType = BlockType::from_int(input.GetBits(2)).expect("UnknownBlockType");
-            match self._blockType {
+            self.block_type = BlockType::from_int(input.get_bits(2)).expect("UnknownBlockType");
+            match self.block_type {
                 BlockType::Dynamic => {
-                    self._state = InflaterState::ReadingNumLitCodes;
+                    self.state = InflaterState::ReadingNumLitCodes;
                 }
                 BlockType::Static => {
-                    self._literalLengthTree = Some(HuffmanTree::StaticLiteralLengthTree());
-                    self._distanceTree = Some(HuffmanTree::StaticDistanceTree());
-                    self._state = InflaterState::DecodeTop;
+                    self.literal_length_tree = Some(HuffmanTree::static_literal_length_tree());
+                    self.distance_tree = Some(HuffmanTree::static_distance_tree());
+                    self.state = InflaterState::DecodeTop;
                 }
                 BlockType::Uncompressed => {
-                    self._state = InflaterState::UncompressedAligning;
+                    self.state = InflaterState::UncompressedAligning;
                 }
             }
         }
 
-        if self._blockType == BlockType::Dynamic
+        if self.block_type == BlockType::Dynamic
         {
-            if self._state < InflaterState::DecodeTop
+            if self.state < InflaterState::DecodeTop
             {
                 // we are reading the header
-                result = self.DecodeDynamicBlockHeader(input);
+                result = self.decode_dynamic_block_header(input);
             }
             else
             {
-                result = self.DecodeBlock(input, &mut eob); // this can returns true when output is full
+                result = self.decode_block(input, &mut eob); // this can returns true when output is full
             }
         }
-        else if (self._blockType == BlockType::Static)
+        else if self.block_type == BlockType::Static
         {
-            result = self.DecodeBlock(input, &mut eob);
+            result = self.decode_block(input, &mut eob);
         }
-        else if (self._blockType == BlockType::Uncompressed)
+        else if self.block_type == BlockType::Uncompressed
         {
-            result = self.DecodeUncompressedBlock(input, &mut eob);
+            result = self.decode_uncompressed_block(input, &mut eob);
         }
         else
         {
@@ -228,21 +229,21 @@ impl InflaterManaged {
         // If we reached the end of the block and the block we were decoding had
         // bfinal=1 (final block)
         //
-        if (eob && (self._bfinal != 0))
+        if eob && (self.bfinal != 0)
         {
-            self._state = InflaterState::Done;
+            self.state = InflaterState::Done;
         }
         return result;
     }
 
-    fn DecodeUncompressedBlock(&mut self, input: &mut InputBuffer, end_of_block: &mut bool) -> bool {
+    fn decode_uncompressed_block(&mut self, input: &mut InputBuffer, end_of_block: &mut bool) -> bool {
         *end_of_block = false;
         loop
         {
-            match self._state {
+            match self.state {
                 InflaterState::UncompressedAligning => {
-                    input.SkipToByteBoundary();
-                    self._state = InflaterState::UncompressedByte1;
+                    input.skip_to_byte_boundary();
+                    self.state = InflaterState::UncompressedByte1;
                     continue; //goto case InflaterState.UncompressedByte1; 
                 }
                 InflaterState::UncompressedByte1
@@ -250,26 +251,26 @@ impl InflaterManaged {
                 | InflaterState::UncompressedByte3
                 | InflaterState::UncompressedByte4
                 => {
-                    let bits = input.GetBits(8);
-                    if (bits < 0)
+                    let bits = input.get_bits(8);
+                    if bits < 0
                     {
                         return false;
                     }
 
-                    self._blockLengthBuffer[(self._state - InflaterState::UncompressedByte1) as usize] = bits as u8;
-                    if (self._state == InflaterState::UncompressedByte4)
+                    self.block_length_buffer[(self.state - InflaterState::UncompressedByte1) as usize] = bits as u8;
+                    if self.state == InflaterState::UncompressedByte4
                     {
-                        self._blockLength = self._blockLengthBuffer[0] as usize + (self._blockLengthBuffer[1] as usize) *256;
-                        let blockLengthComplement: i32 = self._blockLengthBuffer[2] as i32 + (self._blockLengthBuffer[3] as i32) *256;
+                        self.block_length = self.block_length_buffer[0] as usize + (self.block_length_buffer[1] as usize) *256;
+                        let block_length_complement: i32 = self.block_length_buffer[2] as i32 + (self.block_length_buffer[3] as i32) *256;
 
                         // make sure complement matches
-                        if (self._blockLength as u16 != !blockLengthComplement as u16)
+                        if self.block_length as u16 != !block_length_complement as u16
                         {
                             panic!("InvalidBlockLength")
                         }
                     }
 
-                    self._state = match self._state {
+                    self.state = match self.state {
                         InflaterState::UncompressedByte1 => InflaterState::UncompressedByte2,
                         InflaterState::UncompressedByte2 => InflaterState::UncompressedByte3,
                         InflaterState::UncompressedByte3 => InflaterState::UncompressedByte4,
@@ -279,13 +280,13 @@ impl InflaterManaged {
                 }
                 InflaterState::DecodingUncompressed => {
                     // Directly copy bytes from input to output.
-                    let bytesCopied = self._output.CopyFrom(input, self._blockLength);
-                    self._blockLength -= bytesCopied;
+                    let bytes_copied = self.output.copy_from(input, self.block_length);
+                    self.block_length -= bytes_copied;
 
-                    if (self._blockLength == 0)
+                    if self.block_length == 0
                     {
                         // Done with this block, need to re-init bit buffer for next block
-                        self._state = InflaterState::ReadingBFinal;
+                        self.state = InflaterState::ReadingBFinal;
                         *end_of_block = true;
                         return true;
                     }
@@ -293,7 +294,7 @@ impl InflaterManaged {
                     // We can fail to copy all bytes for two reasons:
                     //    Running out of Input
                     //    running out of free space in output window
-                    if (self._output.FreeBytes() == 0)
+                    if self.output.free_bytes() == 0
                     {
                         return true;
                     }
@@ -307,139 +308,139 @@ impl InflaterManaged {
         }
     }
 
-    fn DecodeBlock(&mut self, input: &mut InputBuffer, end_of_block_code_seen: &mut bool) -> bool {
+    fn decode_block(&mut self, input: &mut InputBuffer, end_of_block_code_seen: &mut bool) -> bool {
         *end_of_block_code_seen = false;
 
-        let mut freeBytes = self._output.FreeBytes();   // it is a little bit faster than frequently accessing the property
-        while (freeBytes > 65536)
+        let mut free_bytes = self.output.free_bytes();   // it is a little bit faster than frequently accessing the property
+        while free_bytes > 65536
         {
             // With Deflate64 we can have up to a 64kb length, so we ensure at least that much space is available
             // in the OutputWindow to avoid overwriting previous unflushed output data.
 
             let mut symbol;
-            match self._state {
+            match self.state {
                 InflaterState::DecodeTop => {
                     // decode an element from the literal tree
 
                     // TODO: optimize this!!!
-                    symbol = self._literalLengthTree.as_mut().unwrap().GetNextSymbol(input);
-                    if (symbol < 0)
+                    symbol = self.literal_length_tree.as_mut().unwrap().get_next_symbol(input);
+                    if symbol < 0
                     {
                         // running out of input
                         return false;
                     }
 
-                    if (symbol < 256)
+                    if symbol < 256
                     {
                         // literal
-                        self._output.Write(symbol as u8);
-                        freeBytes -= 1;
+                        self.output.write(symbol as u8);
+                        free_bytes -= 1;
                     }
-                    else if (symbol == 256)
+                    else if symbol == 256
                     {
                         // end of block
                         *end_of_block_code_seen = true;
                         // Reset state
-                        self._state = InflaterState::ReadingBFinal;
+                        self.state = InflaterState::ReadingBFinal;
                         return true;
                     }
                     else
                     {
                         // length/distance pair
                         symbol -= 257;     // length code started at 257
-                        if (symbol < 8)
+                        if symbol < 8
                         {
                             symbol += 3;   // match length = 3,4,5,6,7,8,9,10
-                            self._extraBits = 0;
+                            self.extra_bits = 0;
                         }
-                        else if (!self._deflate64 && symbol == 28)
+                        else if !self.deflate64 && symbol == 28
                         {
                             // extra bits for code 285 is 0
                             symbol = 258;             // code 285 means length 258
-                            self._extraBits = 0;
+                            self.extra_bits = 0;
                         }
                         else
                         {
-                            if (symbol as usize >= ExtraLengthBits.len())
+                            if symbol as usize >= EXTRA_LENGTH_BITS.len()
                             {
                                 panic!("GenericInvalidData");
                             }
-                            self._extraBits = ExtraLengthBits[symbol as usize] as i32;
-                            assert!(self._extraBits != 0, "We handle other cases separately!");
+                            self.extra_bits = EXTRA_LENGTH_BITS[symbol as usize] as i32;
+                            assert_ne!(self.extra_bits, 0, "We handle other cases separately!");
                         }
-                        self._length = symbol as usize;
+                        self.length = symbol.try_into().expect("GenericInvalidData");
 
-                        self._state = InflaterState::HaveInitialLength;
+                        self.state = InflaterState::HaveInitialLength;
                         continue//goto case InflaterState::HaveInitialLength;
                     }
                 }
                 InflaterState::HaveInitialLength => {
-                    if (self._extraBits > 0)
+                    if self.extra_bits > 0
                     {
-                        self._state = InflaterState::HaveInitialLength;
-                        let bits = input.GetBits(self._extraBits);
-                        if (bits < 0)
+                        self.state = InflaterState::HaveInitialLength;
+                        let bits = input.get_bits(self.extra_bits);
+                        if bits < 0
                         {
                             return false;
                         }
 
-                        if (self._length < 0 || self._length >= LengthBase.len())
+                        if self.length >= LENGTH_BASE.len()
                         {
                             panic!("GenericInvalidData");
                             //throw new InvalidDataException(SR.GenericInvalidData);
                         }
-                        self._length = (LengthBase[self._length] as usize + bits as usize);
+                        self.length = LENGTH_BASE[self.length] as usize + bits as usize;
                     }
-                    self._state = InflaterState::HaveFullLength;
+                    self.state = InflaterState::HaveFullLength;
                     continue// goto case InflaterState::HaveFullLength;
                 }
                 InflaterState::HaveFullLength => {
-                    if (self._blockType == BlockType::Dynamic)
+                    if self.block_type == BlockType::Dynamic
                     {
-                        self._distanceCode = self._distanceTree.as_mut().unwrap().GetNextSymbol(input);
+                        self.distance_code = self.distance_tree.as_mut().unwrap().get_next_symbol(input);
                     }
                     else
                     {
                         // get distance code directly for static block
-                        self._distanceCode = input.GetBits(5);
-                        if (self._distanceCode >= 0)
+                        self.distance_code = input.get_bits(5);
+                        if self.distance_code >= 0
                         {
-                            self._distanceCode = StaticDistanceTreeTable[self._distanceCode as usize] as i32;
+                            self.distance_code = STATIC_DISTANCE_TREE_TABLE[self.distance_code as usize] as i32;
                         }
                     }
 
-                    if (self._distanceCode < 0)
+                    if self.distance_code < 0
                     {
                         // running out input
                         return false;
                     }
 
-                    self._state = InflaterState::HaveDistCode;
+                    self.state = InflaterState::HaveDistCode;
                     continue//goto case InflaterState.HaveDistCode;
                 }
 
                 InflaterState::HaveDistCode => {
                     // To avoid a table lookup we note that for distanceCode > 3,
                     // extra_bits = (distanceCode-2) >> 1
-                    let mut offset: usize;
-                    if (self._distanceCode > 3)
+                    let offset: usize;
+                    if self.distance_code > 3
                     {
-                        self._extraBits = (self._distanceCode - 2) >> 1;
-                        let bits = input.GetBits(self._extraBits);
-                        if (bits < 0)
+                        self.extra_bits = (self.distance_code - 2) >> 1;
+                        let bits = input.get_bits(self.extra_bits);
+                        if bits < 0
                         {
                             return false;
                         }
-                        offset = (DistanceBasePosition[self._distanceCode as usize] as usize + bits as usize);
+                        offset = DISTANCE_BASE_POSITION[self.distance_code as usize] as usize + bits as usize;
                     }
                     else
                     {
-                        offset = (self._distanceCode + 1) as usize;
+                        offset = (self.distance_code + 1) as usize;
                     }
 
-                    self._output.WriteLengthDistance(self._length, offset);
-                    freeBytes -= self._length;
-                    self._state = InflaterState::DecodeTop;
+                    self.output.write_length_distance(self.length, offset);
+                    free_bytes -= self.length;
+                    self.state = InflaterState::DecodeTop;
                 }
 
                 _ => {
@@ -475,72 +476,72 @@ impl InflaterManaged {
     // The code length repeat codes can cross from HLIT + 257 to the
     // HDIST + 1 code lengths.  In other words, all code lengths form
     // a single sequence of HLIT + HDIST + 258 values.
-    fn DecodeDynamicBlockHeader(&mut self, input: &mut InputBuffer) -> bool {
+    fn decode_dynamic_block_header(&mut self, input: &mut InputBuffer) -> bool {
         'switch: loop {
-            match self._state {
+            match self.state {
                 InflaterState::ReadingNumLitCodes => {
-                    self._literalLengthCodeCount = input.GetBits(5);
-                    if (self._literalLengthCodeCount < 0)
+                    self.literal_length_code_count = input.get_bits(5);
+                    if self.literal_length_code_count < 0
                     {
                         return false;
                     }
-                    self._literalLengthCodeCount += 257;
-                    self._state = InflaterState::ReadingNumDistCodes;
+                    self.literal_length_code_count += 257;
+                    self.state = InflaterState::ReadingNumDistCodes;
                     continue 'switch //goto case InflaterState::ReadingNumDistCodes;
                 }
                 InflaterState::ReadingNumDistCodes => {
-                    self._distanceCodeCount = input.GetBits(5);
-                    if (self._distanceCodeCount < 0)
+                    self.distance_code_count = input.get_bits(5);
+                    if self.distance_code_count < 0
                     {
                         return false;
                     }
-                    self._distanceCodeCount += 1;
-                    self._state = InflaterState::ReadingNumCodeLengthCodes;
+                    self.distance_code_count += 1;
+                    self.state = InflaterState::ReadingNumCodeLengthCodes;
                     continue 'switch // goto case InflaterState::ReadingNumCodeLengthCodes;
                 }
                 InflaterState::ReadingNumCodeLengthCodes => {
-                    self._codeLengthCodeCount = input.GetBits(4);
-                    if (self._codeLengthCodeCount < 0)
+                    self.code_length_code_count = input.get_bits(4);
+                    if self.code_length_code_count < 0
                     {
                         return false;
                     }
-                    self._codeLengthCodeCount += 4;
-                    self._loopCounter = 0;
-                    self._state = InflaterState::ReadingCodeLengthCodes;
+                    self.code_length_code_count += 4;
+                    self.loop_counter = 0;
+                    self.state = InflaterState::ReadingCodeLengthCodes;
                     continue 'switch // goto case InflaterState::ReadingCodeLengthCodes;
                 }
                 InflaterState::ReadingCodeLengthCodes => {
-                    while (self._loopCounter < self._codeLengthCodeCount)
+                    while self.loop_counter < self.code_length_code_count
                     {
-                        let bits = input.GetBits(3);
-                        if (bits < 0)
+                        let bits = input.get_bits(3);
+                        if bits < 0
                         {
                             return false;
                         }
-                        self._codeLengthTreeCodeLength[CodeOrder[self._loopCounter as usize] as usize] = bits as u8;
-                        self._loopCounter += 1;
+                        self.code_length_tree_code_length[CODE_ORDER[self.loop_counter as usize] as usize] = bits as u8;
+                        self.loop_counter += 1;
                     }
 
-                    for i in self._codeLengthCodeCount as usize..CodeOrder.len()
+                    for i in self.code_length_code_count as usize..CODE_ORDER.len()
                     {
-                        self._codeLengthTreeCodeLength[CodeOrder[i] as usize] = 0;
+                        self.code_length_tree_code_length[CODE_ORDER[i] as usize] = 0;
                     }
 
                     // create huffman tree for code length
-                    self._codeLengthTree = Some(HuffmanTree::new(&self._codeLengthTreeCodeLength));
-                    self._codeArraySize = self._literalLengthCodeCount + self._distanceCodeCount;
-                    self._loopCounter = 0; // reset loop count
+                    self.code_length_tree = Some(HuffmanTree::new(&self.code_length_tree_code_length));
+                    self.code_array_size = self.literal_length_code_count + self.distance_code_count;
+                    self.loop_counter = 0; // reset loop count
 
-                    self._state = InflaterState::ReadingTreeCodesBefore;
+                    self.state = InflaterState::ReadingTreeCodesBefore;
                     continue 'switch // goto case InflaterState::ReadingTreeCodesBefore;
                 }
                 InflaterState::ReadingTreeCodesBefore | InflaterState::ReadingTreeCodesAfter => {
-                    while (self._loopCounter < self._codeArraySize)
+                    while self.loop_counter < self.code_array_size
                     {
-                        if (self._state == InflaterState::ReadingTreeCodesBefore)
+                        if self.state == InflaterState::ReadingTreeCodesBefore
                         {
-                            self._lengthCode = self._codeLengthTree.as_mut().unwrap().GetNextSymbol(input);
-                            if (self._lengthCode < 0)
+                            self.length_code = self.code_length_tree.as_mut().unwrap().get_next_symbol(input);
+                            if self.length_code < 0
                             {
                                 return false;
                             }
@@ -558,83 +559,83 @@ impl InflaterManaged {
                         //    (3 bits of length)
                         //  18: Repeat a code length of 0 for 11 - 138 times
                         //    (7 bits of length)
-                        if (self._lengthCode <= 15)
+                        if self.length_code <= 15
                         {
-                            self._codeList[self._loopCounter as usize] = self._lengthCode as u8;
-                            self._loopCounter += 1;
+                            self.code_list[self.loop_counter as usize] = self.length_code as u8;
+                            self.loop_counter += 1;
                         } else {
-                            let mut repeatCount;
-                            if (self._lengthCode == 16)
+                            let repeat_count;
+                            if self.length_code == 16
                             {
-                                if (!input.EnsureBitsAvailable(2))
+                                if !input.ensure_bits_available(2)
                                 {
-                                    self._state = InflaterState::ReadingTreeCodesAfter;
+                                    self.state = InflaterState::ReadingTreeCodesAfter;
                                     return false;
                                 }
 
-                                if (self._loopCounter == 0)
+                                if self.loop_counter == 0
                                 {
                                     // can't have "prev code" on first code
                                     //throw new InvalidDataException();
                                     panic!()
                                 }
 
-                                let previousCode = self._codeList[self._loopCounter as usize - 1];
-                                repeatCount = input.GetBits(2) + 3;
+                                let previous_code = self.code_list[self.loop_counter as usize - 1];
+                                repeat_count = input.get_bits(2) + 3;
 
-                                if (self._loopCounter + repeatCount > self._codeArraySize)
+                                if self.loop_counter + repeat_count > self.code_array_size
                                 {
                                     //throw new InvalidDataException();
                                     panic!()
                                 }
 
-                                for _ in 0..repeatCount {
-                                    self._codeList[self._loopCounter as usize] = previousCode;
-                                    self._loopCounter += 1;
+                                for _ in 0..repeat_count {
+                                    self.code_list[self.loop_counter as usize] = previous_code;
+                                    self.loop_counter += 1;
                                 }
-                            } else if (self._lengthCode == 17)
+                            } else if self.length_code == 17
                             {
-                                if (!input.EnsureBitsAvailable(3))
+                                if !input.ensure_bits_available(3)
                                 {
-                                    self._state = InflaterState::ReadingTreeCodesAfter;
+                                    self.state = InflaterState::ReadingTreeCodesAfter;
                                     return false;
                                 }
 
-                                repeatCount = input.GetBits(3) + 3;
+                                repeat_count = input.get_bits(3) + 3;
 
-                                if (self._loopCounter + repeatCount > self._codeArraySize)
+                                if self.loop_counter + repeat_count > self.code_array_size
                                 {
                                     //throw new InvalidDataException();
                                     panic!()
                                 }
 
-                                for _ in 0..repeatCount {
-                                    self._codeList[self._loopCounter as usize] = 0;
-                                    self._loopCounter += 1;
+                                for _ in 0..repeat_count {
+                                    self.code_list[self.loop_counter as usize] = 0;
+                                    self.loop_counter += 1;
                                 }
                             } else {
                                 // code == 18
-                                if (!input.EnsureBitsAvailable(7))
+                                if !input.ensure_bits_available(7)
                                 {
-                                    self._state = InflaterState::ReadingTreeCodesAfter;
+                                    self.state = InflaterState::ReadingTreeCodesAfter;
                                     return false;
                                 }
 
-                                repeatCount = input.GetBits(7) + 11;
+                                repeat_count = input.get_bits(7) + 11;
 
-                                if (self._loopCounter + repeatCount > self._codeArraySize)
+                                if self.loop_counter + repeat_count > self.code_array_size
                                 {
                                     //throw new InvalidDataException();
                                     panic!()
                                 }
 
-                                for _ in 0..repeatCount {
-                                    self._codeList[self._loopCounter as usize] = 0;
-                                    self._loopCounter += 1;
+                                for _ in 0..repeat_count {
+                                    self.code_list[self.loop_counter as usize] = 0;
+                                    self.loop_counter += 1;
                                 }
                             }
                         }
-                        self._state = InflaterState::ReadingTreeCodesBefore; // we want to read the next code.
+                        self.state = InflaterState::ReadingTreeCodesBefore; // we want to read the next code.
                     }
                     break 'switch
                 }
@@ -644,30 +645,30 @@ impl InflaterManaged {
             }
         }
 
-        let mut literalTreeCodeLength = [0u8; HuffmanTree::MaxLiteralTreeElements];
-        let mut distanceTreeCodeLength = [0u8; HuffmanTree::MaxDistTreeElements];
+        let mut literal_tree_code_length = [0u8; HuffmanTree::MAX_LITERAL_TREE_ELEMENTS];
+        let mut distance_tree_code_length = [0u8; HuffmanTree::MAX_DIST_TREE_ELEMENTS];
 
         // Create literal and distance tables
-        Array.Copy(&self._codeList, &mut literalTreeCodeLength, self._literalLengthCodeCount as usize);
-        Array.Copy1(&self._codeList, self._literalLengthCodeCount as usize, &mut distanceTreeCodeLength, 0, self._distanceCodeCount as usize);
+        array_copy(&self.code_list, &mut literal_tree_code_length, self.literal_length_code_count as usize);
+        array_copy1(&self.code_list, self.literal_length_code_count as usize, &mut distance_tree_code_length, 0, self.distance_code_count as usize);
 
         // Make sure there is an end-of-block code, otherwise how could we ever end?
-        if (literalTreeCodeLength[HuffmanTree::EndOfBlockCode] == 0)
+        if literal_tree_code_length[HuffmanTree::END_OF_BLOCK_CODE] == 0
         {
             //throw new InvalidDataException();
             panic!("InvalidDataException")
         }
 
-        self._literalLengthTree = Some(HuffmanTree::new(&literalTreeCodeLength));
-        self._distanceTree = Some(HuffmanTree::new(&distanceTreeCodeLength));
-        self._state = InflaterState::DecodeTop;
+        self.literal_length_tree = Some(HuffmanTree::new(&literal_tree_code_length));
+        self.distance_tree = Some(HuffmanTree::new(&distance_tree_code_length));
+        self.state = InflaterState::DecodeTop;
         return true;
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::InflaterManaged::InflaterManaged;
+    use crate::inflater_managed::InflaterManaged;
 
     static ZIP_FILE_DATA: &[u8] = include_bytes!("../test-assets/deflate64.zip");
     static BINARY_WAV_DATA: &[u8] = include_bytes!("../test-assets/folder/binary.wmv");
@@ -686,7 +687,7 @@ mod test {
         assert_eq!(BINARY_WAV_DATA.len(), uncompressed_size);
 
         let mut inflater = Box::new(InflaterManaged::new(true, uncompressed_size));
-        let output = inflater.Inflate(compressed_data, &mut uncompressed_data);
+        let output = inflater.inflate(compressed_data, &mut uncompressed_data);
         assert_eq!(output.bytes_consumed, compressed_size);
         assert_eq!(output.bytes_written, uncompressed_size);
 

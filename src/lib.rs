@@ -1,7 +1,7 @@
-mod InputBuffer;
-mod HuffmanTree;
-mod InflaterManaged;
-mod OutputWindow;
+mod input_buffer;
+mod huffman_tree;
+mod inflater_managed;
+mod output_window;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum BlockType
@@ -22,17 +22,10 @@ impl BlockType {
     }
 }
 
-enum MatchState
-{
-    HasSymbol = 1,
-    HasMatch = 2,
-    HasSymbolAndMatch = 3
-}
-
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 enum InflaterState
 {
-    ReadingHeader = 0,           // Only applies to GZIP
+    //ReadingHeader = 0,           // Only applies to GZIP
 
     ReadingBFinal = 2,
     // About to read bfinal bit
@@ -67,10 +60,10 @@ enum InflaterState
     DecodingUncompressed = 20,
 
     // These three apply only to GZIP
-    StartReadingFooter = 21,
+    //StartReadingFooter = 21,
     // (Initialisation for reading footer)
-    ReadingFooter = 22,
-    VerifyingFooter = 23,
+    //ReadingFooter = 22,
+    //VerifyingFooter = 23,
 
     Done = 24 // Finished
 }
@@ -83,18 +76,12 @@ impl std::ops::Sub for InflaterState {
     }
 }
 
-static Array: ArrayImpl = ArrayImpl {};
+fn array_copy<T : Copy>(source: &[T], dst: &mut [T], length: usize) {
+    dst[..length].copy_from_slice(&source[..length]);
+}
 
-#[derive(Copy, Clone)]
-struct ArrayImpl {}
-
-impl ArrayImpl {
-    fn Copy<T : Copy>(self, source: &[T], dst: &mut [T], length: usize) {
-        dst[..length].copy_from_slice(&source[..length]);
-    }
-    fn Copy1<T : Copy>(self, source: &[T], sourceIndex: usize, dst: &mut [T], dstIndex: usize, length: usize) {
-        dst[dstIndex..][..length].copy_from_slice(&source[sourceIndex..][..length]);
-    }
+fn array_copy1<T : Copy>(source: &[T], source_index: usize, dst: &mut [T], dst_index: usize, length: usize) {
+    dst[dst_index..][..length].copy_from_slice(&source[source_index..][..length]);
 }
 
 #[derive(Debug)]
