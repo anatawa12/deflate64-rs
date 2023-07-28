@@ -664,3 +664,32 @@ impl<'a> InflaterManaged<'a> {
         return true;
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::InflaterManaged::InflaterManaged;
+
+    static ZIP_FILE_DATA: &[u8] = include_bytes!("../test-assets/deflate64.zip");
+    static BINARY_WAV_DATA: &[u8] = include_bytes!("../test-assets/folder/binary.wmv");
+    const ZIP_FILE_ENTRY_HEADER_SIZE: usize = 30;
+
+    #[test]
+    fn binary_wav() {
+        let offset: usize = 0;
+        let file_name_len: usize = "binary.wav".len();
+        let extra_field_len: usize = 0;
+        let compressed_size: usize = 2669743;
+        let uncompressed_size: usize = 2703788;
+
+        let compressed_data = &ZIP_FILE_DATA[offset + ZIP_FILE_ENTRY_HEADER_SIZE + file_name_len + extra_field_len..][..compressed_size];
+        let mut uncompressed_data = vec![0u8; uncompressed_size];
+        assert_eq!(BINARY_WAV_DATA.len(), uncompressed_size);
+
+        let mut inflater = Box::new(InflaterManaged::new(true, uncompressed_size));
+        inflater.SetInput(compressed_data);
+        let output = inflater.Inflate(&mut uncompressed_data);
+        assert_eq!(output, uncompressed_size);
+
+        assert_eq!(uncompressed_data, BINARY_WAV_DATA);
+    }
+}
