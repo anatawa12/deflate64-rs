@@ -60,8 +60,8 @@ pub(crate) struct InflaterManaged<'a> {
     _codeArraySize: i32,
     _lengthCode: i32,
 
-    _codeList: Box<[u8]>,// temporary array to store the code length for literal/Length and distance
-    _codeLengthTreeCodeLength: Box<[u8]>,
+    _codeList: [u8; HuffmanTree::MaxLiteralTreeElements + HuffmanTree::MaxDistTreeElements],// temporary array to store the code length for literal/Length and distance
+    _codeLengthTreeCodeLength: [u8; HuffmanTree::NumberOfCodeLengthTreeElements],
     _deflate64: bool,
     _codeLengthTree: Option<HuffmanTree>,
     /*readonly*/_uncompressedSize: i64,
@@ -75,8 +75,8 @@ impl<'a> InflaterManaged<'a> {
             _input: InputBuffer::new(),
 
             _literalLengthTree: None,
-            _codeList: Box::new([0u8; HuffmanTree::MaxLiteralTreeElements + HuffmanTree::MaxDistTreeElements]),
-            _codeLengthTreeCodeLength: Box::new([0u8; HuffmanTree::NumberOfCodeLengthTreeElements]),
+            _codeList: [0u8; HuffmanTree::MaxLiteralTreeElements + HuffmanTree::MaxDistTreeElements],
+            _codeLengthTreeCodeLength: [0u8; HuffmanTree::NumberOfCodeLengthTreeElements],
             _deflate64: deflate64,
             _codeLengthTree: None,
             _uncompressedSize: uncompressedSize,
