@@ -64,12 +64,12 @@ pub(crate) struct InflaterManaged<'a> {
     _codeLengthTreeCodeLength: [u8; HuffmanTree::NumberOfCodeLengthTreeElements],
     _deflate64: bool,
     _codeLengthTree: Option<HuffmanTree>,
-    /*readonly*/_uncompressedSize: i64,
-    _currentInflatedCount: i64,
+    /*readonly*/_uncompressedSize: usize,
+    _currentInflatedCount: usize,
 }
 
 impl<'a> InflaterManaged<'a> {
-    fn new(deflate64: bool, uncompressedSize: i64) -> Self {
+    fn new(deflate64: bool, uncompressedSize: usize) -> Self {
         Self {
             _output: OutputWindow::new(),
             _input: InputBuffer::new(),
@@ -119,16 +119,16 @@ impl<'a> InflaterManaged<'a> {
         while
         {
             let mut copied = 0;
-            if (self._uncompressedSize == -1)
+            if (self._uncompressedSize == usize::MAX)
             {
                 copied = self._output.CopyTo(bytes);
             } else {
                 if (self._uncompressedSize > self._currentInflatedCount)
                 {
-                    let len = min(bytes.len(), (self._uncompressedSize - self._currentInflatedCount) as usize);
+                    let len = min(bytes.len(), (self._uncompressedSize - self._currentInflatedCount));
                     bytes = &mut bytes[..len];
                     copied = self._output.CopyTo(bytes);
-                    self._currentInflatedCount += copied as i64;
+                    self._currentInflatedCount += copied;
                 } else {
                     self._state = InflaterState::Done;
                     self._output.ClearBytesUsed();
