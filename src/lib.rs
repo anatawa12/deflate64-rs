@@ -3,6 +3,8 @@ mod huffman_tree;
 mod inflater_managed;
 mod output_window;
 
+pub use inflater_managed::InflaterManaged;
+
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum BlockType
 {

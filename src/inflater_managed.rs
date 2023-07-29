@@ -34,7 +34,7 @@ static STATIC_DISTANCE_TREE_TABLE: &'static [u8] = &[
 ];
 
 
-pub(crate) struct InflaterManaged {
+pub struct InflaterManaged {
     output: /*readonly*/ OutputWindow,
     bits: /*readonly*/ BitsBuffer,
     literal_length_tree: Option<HuffmanTree>,
@@ -69,7 +69,7 @@ pub(crate) struct InflaterManaged {
 }
 
 impl InflaterManaged {
-    fn new(deflate64: bool, uncompressed_size: usize) -> Self {
+    pub fn new(deflate64: bool, uncompressed_size: usize) -> Self {
         Self {
             output: OutputWindow::new(),
             bits: BitsBuffer::new(),
