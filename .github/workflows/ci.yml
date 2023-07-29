@@ -31,7 +31,6 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
-          target-dir: target
           key: ${{ matrix.target }}
       - name: Build
         run: cargo build --verbose --target ${{ matrix.target }}
