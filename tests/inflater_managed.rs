@@ -23,6 +23,7 @@ fn binary_wav() {
     let output = inflater.inflate(binary_wav_compressed, &mut uncompressed_data);
     assert_eq!(output.bytes_consumed, BINARY_WAV_COMPRESSED_SIZE);
     assert_eq!(output.bytes_written, BINARY_WAV_UNCOMPRESSED_SIZE);
+    assert!(!output.data_error, "unexpected error");
 
     assert_eq!(&uncompressed_data[..BINARY_WAV_UNCOMPRESSED_SIZE], BINARY_WAV_DATA);
 }
@@ -36,6 +37,7 @@ fn binary_wav_with_size() {
     let output = inflater.inflate(binary_wav_compressed, &mut uncompressed_data);
     assert_eq!(output.bytes_consumed, BINARY_WAV_COMPRESSED_SIZE);
     assert_eq!(output.bytes_written, BINARY_WAV_UNCOMPRESSED_SIZE);
+    assert!(!output.data_error, "unexpected error");
 
     assert_eq!(&uncompressed_data[..BINARY_WAV_UNCOMPRESSED_SIZE], BINARY_WAV_DATA);
 }
@@ -68,6 +70,7 @@ fn binary_wav_shredded(chunk: usize) {
         let output = inflater.inflate(&compressed[..min(chunk, compressed.len())], &mut uncompressed_data[written..]);
         compressed = &compressed[output.bytes_consumed..];
         written += output.bytes_written;
+        assert!(!output.data_error, "unexpected error");
     }
 
     assert_eq!(written, BINARY_WAV_UNCOMPRESSED_SIZE);

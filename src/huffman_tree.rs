@@ -1,4 +1,4 @@
-use crate::DataNeeded;
+use crate::InternalErr;
 use crate::input_buffer::InputBuffer;
 
 pub(crate) struct HuffmanTree {
@@ -237,14 +237,14 @@ impl HuffmanTree {
         }
     }
 
-    pub fn get_next_symbol(&mut self, input: &mut InputBuffer) -> Result<u16, DataNeeded> {
+    pub fn get_next_symbol(&mut self, input: &mut InputBuffer) -> Result<u16, InternalErr> {
         // Try to load 16 bits into input buffer if possible and get the bit_buffer value.
         // If there aren't 16 bits available we will return all we have in the
         // input buffer.
         let bit_buffer = input.try_load_16bits();
         if input.available_bits() == 0
         {    // running out of input.
-            return Err(DataNeeded);
+            return Err(InternalErr::DataNeeded);
         }
 
         // decode an element
@@ -286,7 +286,7 @@ impl HuffmanTree {
         {
             // We already tried to load 16 bits and maximum length is 15,
             // so this means we are running out of input.
-            return Err(DataNeeded);
+            return Err(InternalErr::DataNeeded);
         }
 
         input.skip_bits(code_length);

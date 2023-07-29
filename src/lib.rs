@@ -92,6 +92,8 @@ pub struct InflateResult {
     pub bytes_consumed: usize,
     /// The number of bytes written to the output slice.
     pub bytes_written: usize,
+    // true if there is error
+    pub data_error: bool,
 }
 
 impl InflateResult {
@@ -99,8 +101,12 @@ impl InflateResult {
         Self {
             bytes_consumed: 0,
             bytes_written: 0,
+            data_error: false,
         }
     }
 }
 
-struct DataNeeded;
+enum InternalErr {
+    DataNeeded,
+    DataError
+}

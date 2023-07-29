@@ -118,8 +118,7 @@ impl InflaterManaged {
         // if decodeBlock returns false. Throw an exception.
         let mut result = InflateResult::new();
         let mut input = InputBuffer::new(self.bits, input_bytes);
-        while
-        {
+        while 'while_loop: {
             let mut copied = 0;
             if self.uncompressed_size == usize::MAX
             {
@@ -145,12 +144,21 @@ impl InflaterManaged {
             if bytes.is_empty()
             {
                 // filled in the bytes buffer
-                //break;
-                false
-            } else {
-                // decode will return false when more input is needed
-                !self.finished() && self.decode(&mut input).is_ok()
+                break 'while_loop false
             }
+            // decode will return false when more input is needed
+            if self.finished() {
+                break 'while_loop false
+            }
+            match self.decode(&mut input) {
+                Ok(()) => true,
+                Err(InternalErr::DataNeeded) => false,
+                Err(InternalErr::DataError) => {
+                    result.data_error = true;
+                    false
+                },
+            }
+            self.decode(&mut input).is_ok()
         } {};
 
         self.bits = input.bits;
@@ -158,7 +166,7 @@ impl InflaterManaged {
         return result;
     }
 
-    fn decode(&mut self, input: &mut InputBuffer) -> Result<(), DataNeeded> {
+    fn decode(&mut self, input: &mut InputBuffer) -> Result<(), InternalErr> {
         let mut eob = false;
         let result;
 
@@ -181,7 +189,7 @@ impl InflaterManaged {
             self.state = InflaterState::ReadingBType;
             let bits = input.get_bits(2)?;
 
-            self.block_type = BlockType::from_int(bits).expect("UnknownBlockType");
+            self.block_type = BlockType::from_int(bits).ok_or(InternalErr::DataError)?;
             match self.block_type {
                 BlockType::Dynamic => {
                     self.state = InflaterState::ReadingNumLitCodes;
@@ -219,7 +227,7 @@ impl InflaterManaged {
         }
         else
         {
-            panic!("UnknownBlockType");
+            result = Err(InternalErr::DataError); // UnknownBlockType
         }
 
         //
@@ -233,7 +241,7 @@ impl InflaterManaged {
         return result;
     }
 
-    fn decode_uncompressed_block(&mut self, input: &mut InputBuffer, end_of_block: &mut bool) -> Result<(), DataNeeded> {
+    fn decode_uncompressed_block(&mut self, input: &mut InputBuffer, end_of_block: &mut bool) -> Result<(), InternalErr> {
         *end_of_block = false;
         loop
         {
@@ -257,7 +265,7 @@ impl InflaterManaged {
                         // make sure complement matches
                         if self.block_length as u16 != !block_length_complement as u16
                         {
-                            panic!("InvalidBlockLength")
+                            return Err(InternalErr::DataError) // InvalidBlockLength
                         }
                     }
 
@@ -290,7 +298,7 @@ impl InflaterManaged {
                         return Ok(());
                     }
 
-                    return Err(DataNeeded);
+                    return Err(InternalErr::DataNeeded);
                 }
                 _ => {
                     panic!("UnknownState");
@@ -299,7 +307,7 @@ impl InflaterManaged {
         }
     }
 
-    fn decode_block(&mut self, input: &mut InputBuffer, end_of_block_code_seen: &mut bool) -> Result<(), DataNeeded> {
+    fn decode_block(&mut self, input: &mut InputBuffer, end_of_block_code_seen: &mut bool) -> Result<(), InternalErr> {
         *end_of_block_code_seen = false;
 
         let mut free_bytes = self.output.free_bytes();   // it is a little bit faster than frequently accessing the property
@@ -349,12 +357,12 @@ impl InflaterManaged {
                         {
                             if symbol as usize >= EXTRA_LENGTH_BITS.len()
                             {
-                                panic!("GenericInvalidData");
+                                return Err(InternalErr::DataError); // GenericInvalidData
                             }
                             self.extra_bits = EXTRA_LENGTH_BITS[symbol as usize] as i32;
                             assert_ne!(self.extra_bits, 0, "We handle other cases separately!");
                         }
-                        self.length = symbol.try_into().expect("GenericInvalidData");
+                        self.length = symbol as usize;
 
                         self.state = InflaterState::HaveInitialLength;
                         continue//goto case InflaterState::HaveInitialLength;
@@ -368,8 +376,7 @@ impl InflaterManaged {
 
                         if self.length >= LENGTH_BASE.len()
                         {
-                            panic!("GenericInvalidData");
-                            //throw new InvalidDataException(SR.GenericInvalidData);
+                            return Err(InternalErr::DataError); // GenericInvalidData
                         }
                         self.length = LENGTH_BASE[self.length] as usize + bits as usize;
                     }
@@ -446,7 +453,7 @@ impl InflaterManaged {
     // The code length repeat codes can cross from HLIT + 257 to the
     // HDIST + 1 code lengths.  In other words, all code lengths form
     // a single sequence of HLIT + HDIST + 258 values.
-    fn decode_dynamic_block_header(&mut self, input: &mut InputBuffer) -> Result<(), DataNeeded> {
+    fn decode_dynamic_block_header(&mut self, input: &mut InputBuffer) -> Result<(), InternalErr> {
         'switch: loop {
             match self.state {
                 InflaterState::ReadingNumLitCodes => {
@@ -522,8 +529,7 @@ impl InflaterManaged {
                                 if self.loop_counter == 0
                                 {
                                     // can't have "prev code" on first code
-                                    //throw new InvalidDataException();
-                                    panic!()
+                                    return Err(InternalErr::DataError);
                                 }
 
                                 let bits = input.get_bits(2)?;
@@ -534,7 +540,7 @@ impl InflaterManaged {
                                 if self.loop_counter + repeat_count > self.code_array_size
                                 {
                                     //throw new InvalidDataException();
-                                    panic!()
+                                    return Err(InternalErr::DataError);
                                 }
 
                                 for _ in 0..repeat_count {
@@ -551,7 +557,7 @@ impl InflaterManaged {
                                 if self.loop_counter + repeat_count > self.code_array_size
                                 {
                                     //throw new InvalidDataException();
-                                    panic!()
+                                    return Err(InternalErr::DataError);
                                 }
 
                                 for _ in 0..repeat_count {
@@ -568,7 +574,7 @@ impl InflaterManaged {
                                 if self.loop_counter + repeat_count > self.code_array_size
                                 {
                                     //throw new InvalidDataException();
-                                    panic!()
+                                    return Err(InternalErr::DataError);
                                 }
 
                                 for _ in 0..repeat_count {
@@ -597,8 +603,7 @@ impl InflaterManaged {
         // Make sure there is an end-of-block code, otherwise how could we ever end?
         if literal_tree_code_length[HuffmanTree::END_OF_BLOCK_CODE] == 0
         {
-            //throw new InvalidDataException();
-            panic!("InvalidDataException")
+            return Err(InternalErr::DataError); // InvalidDataException
         }
 
         self.literal_length_tree = Some(HuffmanTree::new(&literal_tree_code_length));

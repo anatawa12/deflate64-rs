@@ -1,5 +1,5 @@
 use std::cmp::min;
-use crate::DataNeeded;
+use crate::InternalErr;
 
 #[derive(Copy, Clone)]
 pub(crate) struct BitsBuffer {
@@ -99,12 +99,12 @@ impl<'a> InputBuffer<'a> {
         (1 << count) - 1
     }
 
-    pub fn get_bits(&mut self, count: i32) -> Result<u16, DataNeeded> {
+    pub fn get_bits(&mut self, count: i32) -> Result<u16, InternalErr> {
         debug_assert!(0 < count && count <= 16, "count is invalid.");
 
         if !self.ensure_bits_available(count)
         {
-            return Err(DataNeeded);
+            return Err(InternalErr::DataNeeded);
         }
 
         let result = (self.bits.bit_buffer & self.get_bit_mask(count)) as u16;
