@@ -69,10 +69,12 @@ pub struct InflaterManaged {
 }
 
 impl InflaterManaged {
+    /// Initializes Inflater
     pub fn new() -> Self {
         Self::with_uncompressed_size(usize::MAX)
     }
 
+    /// Initializes Inflater with expected uncompressed size.
     pub fn with_uncompressed_size(uncompressed_size: usize) -> Self {
         Self {
             output: OutputWindow::new(),
@@ -103,15 +105,18 @@ impl InflaterManaged {
         }
     }
 
+    /// Is the inflating
     pub fn finished(&self) -> bool {
         self.state == InflaterState::Done
     }
 
+    /// The count of bytes currently inflater has in inner buffer
     #[allow(dead_code)]
     pub fn available_output(&self) -> usize {
         self.output.available_bytes()
     }
 
+    /// Decompress data
     pub fn inflate(&mut self, input_bytes: &[u8], mut bytes: &mut [u8]) -> InflateResult {
         // copy bytes from output to outputbytes if we have available bytes
         // if buffer is not filled up. keep decoding until no input are available
