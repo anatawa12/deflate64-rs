@@ -69,7 +69,11 @@ pub struct InflaterManaged {
 }
 
 impl InflaterManaged {
-    pub fn new(deflate64: bool, uncompressed_size: usize) -> Self {
+    pub fn new() -> Self {
+        Self::with_uncompressed_size(usize::MAX)
+    }
+
+    pub fn with_uncompressed_size(uncompressed_size: usize) -> Self {
         Self {
             output: OutputWindow::new(),
             bits: BitsBuffer::new(),
@@ -77,7 +81,7 @@ impl InflaterManaged {
             literal_length_tree: None,
             code_list: [0u8; HuffmanTree::MAX_LITERAL_TREE_ELEMENTS + HuffmanTree::MAX_DIST_TREE_ELEMENTS],
             code_length_tree_code_length: [0u8; HuffmanTree::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS],
-            deflate64: deflate64,
+            deflate64: true,
             code_length_tree: None,
             uncompressed_size,
             state: InflaterState::ReadingBFinal, // start by reading BFinal bit
@@ -624,7 +628,7 @@ mod test {
         let mut uncompressed_data = vec![0u8; uncompressed_size];
         assert_eq!(BINARY_WAV_DATA.len(), uncompressed_size);
 
-        let mut inflater = Box::new(InflaterManaged::new(true, uncompressed_size));
+        let mut inflater = Box::new(InflaterManaged::with_uncompressed_size(uncompressed_size));
         let output = inflater.inflate(compressed_data, &mut uncompressed_data);
         assert_eq!(output.bytes_consumed, compressed_size);
         assert_eq!(output.bytes_written, uncompressed_size);
