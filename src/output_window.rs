@@ -1,5 +1,5 @@
-use std::cmp::min;
 use crate::input_buffer::InputBuffer;
+use std::cmp::min;
 
 // With Deflate64 we can have up to a 65536 length as well as up to a 65538 distance. This means we need a Window that is at
 // least 131074 bytes long so we have space to retrieve up to a full 64kb in lookback and place it in our buffer without
@@ -35,15 +35,17 @@ impl OutputWindow {
 
     /// <summary>Add a byte to output window.</summary>
     pub fn write(&mut self, b: u8) {
-        debug_assert!(self.bytes_used < WINDOW_SIZE, "Can't add byte when window is full!");
+        debug_assert!(
+            self.bytes_used < WINDOW_SIZE,
+            "Can't add byte when window is full!"
+        );
         self.window[self.end] = b;
         self.end += 1;
         self.end &= WINDOW_MASK;
         self.bytes_used += 1;
     }
 
-    pub fn write_length_distance(&mut self, mut length: usize, distance: usize)
-    {
+    pub fn write_length_distance(&mut self, mut length: usize, distance: usize) {
         debug_assert!((self.bytes_used + length) <= WINDOW_SIZE, "No Enough space");
 
         // move backwards distance bytes in the output stream,
@@ -52,10 +54,8 @@ impl OutputWindow {
         let mut copy_start = (self.end.overflowing_sub(distance).0) & WINDOW_MASK; // start position for coping.
 
         let border = WINDOW_SIZE - length;
-        if copy_start <= border && self.end < border
-        {
-            if length <= distance
-            {
+        if copy_start <= border && self.end < border {
+            if length <= distance {
                 // src, srcIdx, dst, dstIdx, len
                 // Array.copy(self._window, copy_start, self._window, self._end, length);
                 unsafe {
@@ -63,7 +63,7 @@ impl OutputWindow {
                     std::ptr::copy(
                         self.window.as_ptr().add(copy_start),
                         self.window.as_mut_ptr().add(self.end),
-                        length
+                        length,
                     )
                 }
                 self.end += length;
@@ -72,8 +72,7 @@ impl OutputWindow {
                 // position; for example, if the last 2 bytes decoded have values
                 // X and Y, a string reference with <length = 5, distance = 2>
                 // adds X,Y,X,Y,X to the output stream.
-                while length > 0
-                {
+                while length > 0 {
                     length -= 1;
                     self.window[self.end] = self.window[copy_start];
                     self.end += 1;
@@ -82,8 +81,7 @@ impl OutputWindow {
             }
         } else {
             // copy byte by byte
-            while length > 0
-            {
+            while length > 0 {
                 length -= 1;
                 self.window[self.end] = self.window[copy_start];
                 self.end += 1;
@@ -98,19 +96,19 @@ impl OutputWindow {
     /// Copy up to length of bytes from input directly.
     /// This is used for uncompressed block.
     /// </summary>
-    pub fn copy_from(&mut self, input: &mut InputBuffer, mut length: usize) -> usize
-    {
-        length = min(min(length, WINDOW_SIZE - self.bytes_used), input.available_bytes());
+    pub fn copy_from(&mut self, input: &mut InputBuffer, mut length: usize) -> usize {
+        length = min(
+            min(length, WINDOW_SIZE - self.bytes_used),
+            input.available_bytes(),
+        );
         let mut copied: usize;
 
         // We might need wrap around to copy all bytes.
         let tail_len = WINDOW_SIZE - self.end;
-        if length > tail_len
-        {
+        if length > tail_len {
             // copy the first part
             copied = input.copy_to(&mut self.window[self.end..][..tail_len]);
-            if copied == tail_len
-            {
+            if copied == tail_len {
                 // only try to copy the second part if we have enough bytes in input
                 copied += input.copy_to(&mut self.window[..length - tail_len]);
             }
@@ -135,23 +133,21 @@ impl OutputWindow {
     }
 
     /// <summary>Copy the decompressed bytes to output buffer.</summary>
-    pub fn copy_to(&mut self, mut output: &mut [u8]) -> usize
-    {
+    pub fn copy_to(&mut self, mut output: &mut [u8]) -> usize {
         let copy_end;
 
-        if output.len() > self.bytes_used
-        {
+        if output.len() > self.bytes_used {
             // we can copy all the decompressed bytes out
             copy_end = self.end;
             output = &mut output[..self.bytes_used];
         } else {
-            copy_end = (self.end - self.bytes_used + output.len()) & WINDOW_MASK; // copy length of bytes
+            copy_end = (self.end - self.bytes_used + output.len()) & WINDOW_MASK;
+            // copy length of bytes
         }
 
         let copied = output.len();
 
-        if output.len() > copy_end
-        {
+        if output.len() > copy_end {
             let tail_len = output.len() - copy_end;
             // this means we need to copy two parts separately
             // copy the taillen bytes from the end of the output window

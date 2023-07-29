@@ -1,24 +1,23 @@
 //!
 //! Deflate64 implementation based on [.NET System.IO.Compression][dotnet].
-//! 
+//!
 //! This is made to unzip zip file with deflate64 made with windows 11.
-//! 
+//!
 //! [dotnet]: https://github.com/dotnet/runtime/tree/e5efd8010e19593298dc2c3ee15106d5aec5a924/src/libraries/System.IO.Compression/src/System/IO/Compression/DeflateManaged
-//! 
+//!
 
-mod input_buffer;
 mod huffman_tree;
 mod inflater_managed;
+mod input_buffer;
 mod output_window;
 
 pub use inflater_managed::InflaterManaged;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-enum BlockType
-{
+enum BlockType {
     Uncompressed = 0,
     Static = 1,
-    Dynamic = 2
+    Dynamic = 2,
 }
 
 impl BlockType {
@@ -27,19 +26,17 @@ impl BlockType {
             0 => Some(Self::Uncompressed),
             1 => Some(Self::Static),
             2 => Some(Self::Dynamic),
-            _ => None
+            _ => None,
         }
     }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-enum InflaterState
-{
+enum InflaterState {
     //ReadingHeader = 0,           // Only applies to GZIP
-
     ReadingBFinal = 2,
     // About to read bfinal bit
-    ReadingBType = 3,                // About to read blockType bits
+    ReadingBType = 3, // About to read blockType bits
 
     ReadingNumLitCodes = 4,
     // About to read # literal codes
@@ -51,7 +48,7 @@ enum InflaterState
     // In the middle of reading the code length codes
     ReadingTreeCodesBefore = 8,
     // In the middle of reading tree codes (loop top)
-    ReadingTreeCodesAfter = 9,       // In the middle of reading tree codes (extension; code > 15)
+    ReadingTreeCodesAfter = 9, // In the middle of reading tree codes (extension; code > 15)
 
     DecodeTop = 10,
     // About to decode a literal (char/match) in a compressed block
@@ -59,7 +56,7 @@ enum InflaterState
     // Decoding a match, have the literal code (base length)
     HaveFullLength = 12,
     // Ditto, now have the full match length (incl. extra length bits)
-    HaveDistCode = 13,               // Ditto, now have the distance code also, need extra dist bits
+    HaveDistCode = 13, // Ditto, now have the distance code also, need extra dist bits
 
     /* uncompressed blocks */
     UncompressedAligning = 15,
@@ -74,8 +71,7 @@ enum InflaterState
     // (Initialisation for reading footer)
     //ReadingFooter = 22,
     //VerifyingFooter = 23,
-
-    Done = 24 // Finished
+    Done = 24, // Finished
 }
 
 impl std::ops::Sub for InflaterState {
@@ -86,11 +82,17 @@ impl std::ops::Sub for InflaterState {
     }
 }
 
-fn array_copy<T : Copy>(source: &[T], dst: &mut [T], length: usize) {
+fn array_copy<T: Copy>(source: &[T], dst: &mut [T], length: usize) {
     dst[..length].copy_from_slice(&source[..length]);
 }
 
-fn array_copy1<T : Copy>(source: &[T], source_index: usize, dst: &mut [T], dst_index: usize, length: usize) {
+fn array_copy1<T: Copy>(
+    source: &[T],
+    source_index: usize,
+    dst: &mut [T],
+    dst_index: usize,
+    length: usize,
+) {
     dst[dst_index..][..length].copy_from_slice(&source[source_index..][..length]);
 }
 
@@ -116,5 +118,5 @@ impl InflateResult {
 
 enum InternalErr {
     DataNeeded,
-    DataError
+    DataError,
 }

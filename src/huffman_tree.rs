@@ -1,5 +1,5 @@
-use crate::InternalErr;
 use crate::input_buffer::InputBuffer;
+use crate::InternalErr;
 
 pub(crate) struct HuffmanTree {
     table_bits: i32,
@@ -26,17 +26,16 @@ impl HuffmanTree {
         return HuffmanTree::new(&Self::get_static_distance_tree_length());
     }
 
-    pub fn new(code_lengths: &[u8]) -> HuffmanTree
-    {
+    pub fn new(code_lengths: &[u8]) -> HuffmanTree {
         debug_assert!(
-            code_lengths.len() == Self::MAX_LITERAL_TREE_ELEMENTS ||
-                code_lengths.len() == Self::MAX_DIST_TREE_ELEMENTS ||
-                code_lengths.len() == Self::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS,
-            "we only expect three kinds of Length here");
+            code_lengths.len() == Self::MAX_LITERAL_TREE_ELEMENTS
+                || code_lengths.len() == Self::MAX_DIST_TREE_ELEMENTS
+                || code_lengths.len() == Self::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS,
+            "we only expect three kinds of Length here"
+        );
         let code_length_array = code_lengths.to_vec().into_boxed_slice();
 
-        let table_bits = if code_length_array.len() == Self::MAX_LITERAL_TREE_ELEMENTS
-        {
+        let table_bits = if code_length_array.len() == Self::MAX_LITERAL_TREE_ELEMENTS {
             // bits for Literal/Length tree table
             9
         } else {
@@ -105,7 +104,7 @@ impl HuffmanTree {
         for &code_length in self.code_length_array.iter() {
             bit_length_count[code_length as usize] += 1;
         }
-        bit_length_count[0] = 0;  // clear count for length 0
+        bit_length_count[0] = 0; // clear count for length 0
 
         let mut next_code = [0u32; 17];
         let mut temp_code = 0u32;
@@ -117,8 +116,7 @@ impl HuffmanTree {
 
         let mut code = [0u32; Self::MAX_LITERAL_TREE_ELEMENTS];
         for (i, &len) in self.code_length_array.iter().enumerate() {
-            if len > 0
-            {
+            if len > 0 {
                 code[i] = Self::bit_reverse(next_code[len as usize], len as usize);
                 next_code[len as usize] += 1;
             }
@@ -137,13 +135,11 @@ impl HuffmanTree {
         let mut avail = self.code_length_array.len() as i16;
 
         for (ch, &len) in self.code_length_array.iter().enumerate() {
-            if len > 0
-            {
+            if len > 0 {
                 // start value (bit reversed)
                 let mut start = code_array[ch] as usize;
 
-                if len as i32 <= self.table_bits
-                {
+                if len as i32 <= self.table_bits {
                     // If a particular symbol is shorter than nine bits,
                     // then that symbol's translation is duplicated
                     // in all those entries that start with that symbol's bits.
@@ -165,8 +161,7 @@ impl HuffmanTree {
                     // or: initial_start_at < increment
                     //
                     let increment = 1 << len;
-                    if start >= increment
-                    {
+                    if start >= increment {
                         //throw new InvalidDataException(SR.InvalidHuffmanData);
                         panic!("InvalidHuffmanData");
                     }
@@ -177,9 +172,7 @@ impl HuffmanTree {
                         self.table[start] = ch as i16;
                         start += increment;
                     }
-                }
-                else
-                {
+                } else {
                     // For any code which has length longer than num_elements,
                     // build a binary tree.
 
@@ -194,32 +187,30 @@ impl HuffmanTree {
                     let mut index = start & ((1 << self.table_bits) - 1);
                     let mut array = &mut self.table;
 
-                    while
-                    {
+                    while {
                         let mut value = array[index];
 
-                        if value == 0
-                        {
+                        if value == 0 {
                             // set up next pointer if this node is not used before.
                             array[index] = -avail; // use next available slot.
                             value = -avail;
                             avail += 1;
                         }
 
-                        if value > 0
-                        {
+                        if value > 0 {
                             // prevent an IndexOutOfRangeException from array[index]
                             panic!("InvalidHuffmanData");
                         }
 
-                        debug_assert!(value < 0, "create_table: Only negative numbers are used for tree pointers!");
+                        debug_assert!(
+                            value < 0,
+                            "create_table: Only negative numbers are used for tree pointers!"
+                        );
 
-                        if (start & code_bit_mask) == 0
-                        {
+                        if (start & code_bit_mask) == 0 {
                             // if current bit is 0, go change the left array
                             array = &mut self.left;
-                        }
-                        else {
+                        } else {
                             // if current bit is 1, set value in the right array
                             array = &mut self.right;
                         }
@@ -229,7 +220,7 @@ impl HuffmanTree {
                         overflow_bits -= 1;
 
                         overflow_bits != 0
-                    } {};
+                    } {}
 
                     array[index] = ch as i16;
                 }
@@ -242,29 +233,27 @@ impl HuffmanTree {
         // If there aren't 16 bits available we will return all we have in the
         // input buffer.
         let bit_buffer = input.try_load_16bits();
-        if input.available_bits() == 0
-        {    // running out of input.
+        if input.available_bits() == 0 {
+            // running out of input.
             return Err(InternalErr::DataNeeded);
         }
 
         // decode an element
         let mut symbol = self.table[bit_buffer as usize & self.table_mask as usize];
-        if symbol < 0
-        {       //  this will be the start of the binary tree
+        if symbol < 0 {
+            //  this will be the start of the binary tree
             // navigate the tree
             let mut mask = 1 << self.table_bits;
-            while
-            {
+            while {
                 symbol = -symbol;
                 if (bit_buffer & mask) == 0 {
                     symbol = self.left[symbol as usize];
-                }
-                else {
+                } else {
                     symbol = self.right[symbol as usize];
                 }
                 mask <<= 1;
                 symbol < 0
-            } {};
+            } {}
         }
 
         debug_assert!(symbol >= 0);
@@ -272,8 +261,7 @@ impl HuffmanTree {
         let code_length = self.code_length_array[symbol as usize] as i32;
 
         // huffman code lengths must be at least 1 bit long
-        if code_length <= 0
-        {
+        if code_length <= 0 {
             panic!("InvalidHuffmanData");
         }
 
@@ -282,8 +270,7 @@ impl HuffmanTree {
         // we read only part of the code), we can hit the entry in the table or the tree
         // for another symbol. However the length of another symbol will not match the
         // available bits count.
-        if code_length > input.available_bits()
-        {
+        if code_length > input.available_bits() {
             // We already tried to load 16 bits and maximum length is 15,
             // so this means we are running out of input.
             return Err(InternalErr::DataNeeded);
