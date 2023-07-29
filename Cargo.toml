@@ -3,6 +3,19 @@ name = "deflate64"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
+authors = ["anatawa12 <anatawa12@icloud.com>"]
+description = "Deflate64 implementation based on .NET's implementation"
+homepage = "https://github.com/anatawa12/deflate64-rs#readme"
+repository = "https://github.com/anatawa12/deflate64-rs"
+readme = "README.md"
+keywords = ["deflate", "deflate64", "compression"]
+categories = ["compression"]
+
+exclude = [
+    ".github/**",
+    "tests/**",
+    "test-assets/**",
+]
 
 [dependencies]
