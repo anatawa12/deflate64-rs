@@ -59,6 +59,7 @@ impl HuffmanTree {
             left,
             right,
             code_length_array,
+            #[cfg(debug_assertions)]
             code_array_debug: Box::new([]),
             table_mask,
         };
