@@ -162,7 +162,6 @@ impl InflaterManaged {
                     false
                 }
             }
-            self.decode(&mut input).is_ok()
         } {}
 
         self.bits = input.bits;
