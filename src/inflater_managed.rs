@@ -33,6 +33,8 @@ static STATIC_DISTANCE_TREE_TABLE: &'static [u8] = &[
     0x01, 0x11, 0x09, 0x19, 0x05, 0x15, 0x0d, 0x1d, 0x03, 0x13, 0x0b, 0x1b, 0x07, 0x17, 0x0f, 0x1f,
 ];
 
+/// This struct has big buffer so It's not recommended to move this struct.
+#[derive(Debug)]
 pub struct InflaterManaged {
     output: OutputWindow,
     bits: BitsBuffer,

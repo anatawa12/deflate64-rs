@@ -1,7 +1,7 @@
 use crate::InternalErr;
 use std::cmp::min;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct BitsBuffer {
     bit_buffer: u32,
     bits_in_buffer: i32,

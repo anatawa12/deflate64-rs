@@ -1,6 +1,7 @@
 use crate::input_buffer::InputBuffer;
 use crate::InternalErr;
 
+#[derive(Debug)]
 pub(crate) struct HuffmanTree {
     table_bits: i32,
     table: Box<[i16]>,

@@ -14,6 +14,7 @@ const WINDOW_MASK: usize = 262143;
 /// we need to look back in the output window and copy bytes from there.
 /// We use a byte array of WINDOW_SIZE circularly.
 /// </summary>
+#[derive(Debug)]
 pub(crate) struct OutputWindow {
     window: [u8; WINDOW_SIZE],
     end: usize,

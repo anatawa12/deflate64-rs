@@ -13,7 +13,7 @@ mod output_window;
 
 pub use inflater_managed::InflaterManaged;
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum BlockType {
     Uncompressed = 0,
     Static = 1,
@@ -31,7 +31,7 @@ impl BlockType {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 enum InflaterState {
     //ReadingHeader = 0,           // Only applies to GZIP
     ReadingBFinal = 2,
