@@ -33,6 +33,8 @@ static STATIC_DISTANCE_TREE_TABLE: &'static [u8] = &[
     0x01, 0x11, 0x09, 0x19, 0x05, 0x15, 0x0d, 0x1d, 0x03, 0x13, 0x0b, 0x1b, 0x07, 0x17, 0x0f, 0x1f,
 ];
 
+/// The streaming Inflater for deflate64
+/// 
 /// This struct has big buffer so It's not recommended to move this struct.
 #[derive(Debug)]
 pub struct InflaterManaged {
@@ -119,31 +121,34 @@ impl InflaterManaged {
         self.state == InflaterState::DataErrored
     }
 
-    /// The count of bytes currently inflater has in inner buffer
+    /// The count of bytes currently inflater has in internal output buffer
     #[allow(dead_code)]
     pub fn available_output(&self) -> usize {
         self.output.available_bytes()
     }
 
-    /// Decompress data
-    pub fn inflate(&mut self, input_bytes: &[u8], mut bytes: &mut [u8]) -> InflateResult {
+    /// Try to decompress from `input` to `output`.
+    /// 
+    /// This will decompress data until `output` is full, `input` is empty,
+    /// the end if the deflate64 stream is hit, or there is error data in the deflate64 stream.
+    pub fn inflate(&mut self, input: &[u8], mut output: &mut [u8]) -> InflateResult {
         // copy bytes from output to outputbytes if we have available bytes
         // if buffer is not filled up. keep decoding until no input are available
         // if decodeBlock returns false. Throw an exception.
         let mut result = InflateResult::new();
-        let mut input = InputBuffer::new(self.bits, input_bytes);
+        let mut input = InputBuffer::new(self.bits, input);
         while 'while_loop: {
             let mut copied = 0;
             if self.uncompressed_size == usize::MAX {
-                copied = self.output.copy_to(bytes);
+                copied = self.output.copy_to(output);
             } else {
                 if self.uncompressed_size > self.current_inflated_count {
                     let len = min(
-                        bytes.len(),
+                        output.len(),
                         self.uncompressed_size - self.current_inflated_count,
                     );
-                    bytes = &mut bytes[..len];
-                    copied = self.output.copy_to(bytes);
+                    output = &mut output[..len];
+                    copied = self.output.copy_to(output);
                     self.current_inflated_count += copied;
                 } else {
                     self.state = InflaterState::Done;
@@ -151,11 +156,11 @@ impl InflaterManaged {
                 }
             }
             if copied > 0 {
-                bytes = &mut bytes[copied..];
+                output = &mut output[copied..];
                 result.bytes_written += copied;
             }
 
-            if bytes.is_empty() {
+            if output.is_empty() {
                 // filled in the bytes buffer
                 break 'while_loop false;
             }

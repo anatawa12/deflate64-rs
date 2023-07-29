@@ -98,17 +98,19 @@ fn array_copy1<T: Copy>(
     dst[dst_index..][..length].copy_from_slice(&source[source_index..][..length]);
 }
 
+/// A structure containing result of streaming inflate.
 #[derive(Debug)]
 pub struct InflateResult {
     /// The number of bytes consumed from the input slice.
     pub bytes_consumed: usize,
     /// The number of bytes written to the output slice.
     pub bytes_written: usize,
-    // true if there is error
+    /// true if there is error in input buffer
     pub data_error: bool,
 }
 
 impl InflateResult {
+    /// Creates `InflateResult` with zero bytes consumed and written, and no error.
     pub fn new() -> Self {
         Self {
             bytes_consumed: 0,
