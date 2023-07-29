@@ -1,0 +1,117 @@
+name: Publish
+
+on:
+  workflow_dispatch: {}
+
+env:
+  RELEASER_CHANGER: 'regex-pattern:version = "$1"@Cargo.toml'
+  CRATE_NAME: deflate64
+
+jobs:
+  pre-build:
+    name: Update version name
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.update.outputs.version }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: anatawa12/something-releaser@v2
+      - uses: snow-actions/git-config-user@v1.0.0
+
+      - name: update version name
+        id: update
+        run: |-
+          # update version name
+          VERSION="$(get-version)"
+          if ! [[ "$VERSION" = *-SNAPSHOT ]]; then
+            echo 'VERSION IS NOT SNAPSHOT' >&2
+            exit 1
+          fi
+          VERSION="$(version-unsnapshot "$VERSION")"
+          gh-set-output version "$VERSION"
+          set-version "$VERSION"
+          cargo metadata --format-version=1 > /dev/null
+          # commit & tag
+          git add .
+          git commit -m "v$VERSION"
+          git branch releasing
+          git push -u origin releasing
+
+  publish-crates-io:
+    name: Publish to crates.io
+    environment:
+      name: crates.io
+      url: https://crates.io/crates/${{ env.CRATE_NAME }}
+    runs-on: ubuntu-latest
+    needs: [pre-build]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'releasing'
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish CARGO
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish
+
+  publish:
+    name: Publish to GitHub
+    environment:
+      name: master branch
+      url: https://github.com/${{ github.repository }}/releases/v${{ needs.pre-build.outputs.version }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: [publish-crates-io]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'releasing'
+          fetch-depth: 2
+          token: ${{ secrets.MASTER_GITHUB_PAT }}
+
+      # tools
+      - uses: anatawa12/something-releaser@v2
+      - uses: snow-actions/git-config-user@v1.0.0
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/download-artifact@v3
+        with:
+          path: outputs
+
+      - name: Push tag
+        env:
+          VERSION: ${{ needs.pre-build.outputs.version }}
+        run: |-
+          # set tag and publish current version
+          git tag "v$VERSION"
+          git push && git push --tags
+          # create master and push
+          git switch -c master
+          git fetch origin master --depth=1
+          git log --all --graph
+          git push -u origin master
+
+      - name: create release
+        shell: bash
+        env:
+          VERSION: ${{ needs.pre-build.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |-
+          sleep 1
+          gh release create --verify-tag "v$VERSION"
+
+      - name: Update To Next Version
+        run: |
+          VERSION="$(get-version)"
+          VERSION="$(version-next "$VERSION")"
+          set-version "$(version-snapshot "$VERSION")"
+          cargo metadata --format-version=1 > /dev/null
+          git add .
+          git commit -m "prepare for next version: $VERSION"
+          git push
+          git push --delete origin releasing

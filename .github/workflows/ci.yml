@@ -1,0 +1,39 @@
+name: CI (Build)
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - runs-on: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runs-on: windows-latest
+            target: x86_64-pc-windows-msvc
+        runs-on:
+          - ubuntu-latest
+          - windows-latest
+
+    runs-on: ${{ matrix.runs-on }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v1
+        with:
+          target-dir: target
+          key: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --verbose --target ${{ matrix.target }}
+      - name: Run tests
+        run: cargo test --verbose --target ${{ matrix.target }}
