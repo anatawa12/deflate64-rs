@@ -107,9 +107,16 @@ impl InflaterManaged {
         }
     }
 
-    /// Is the inflating
+    /// Returns true if deflating finished
+    ///
+    /// This also returns true if this inflater is in error state
     pub fn finished(&self) -> bool {
-        self.state == InflaterState::Done
+        self.state == InflaterState::Done || self.state == InflaterState::DataErrored
+    }
+
+    /// Returns true if this inflater is in error state
+    pub fn errored(&self) -> bool {
+        self.state == InflaterState::DataErrored
     }
 
     /// The count of bytes currently inflater has in inner buffer
@@ -153,13 +160,17 @@ impl InflaterManaged {
                 break 'while_loop false;
             }
             // decode will return false when more input is needed
-            if self.finished() {
+            if self.errored() {
+                result.data_error = true;
+                break 'while_loop false;
+            } else if self.finished() {
                 break 'while_loop false;
             }
             match self.decode(&mut input) {
                 Ok(()) => true,
                 Err(InternalErr::DataNeeded) => false,
                 Err(InternalErr::DataError) => {
+                    self.state = InflaterState::DataErrored;
                     result.data_error = true;
                     false
                 }
@@ -175,7 +186,9 @@ impl InflaterManaged {
         let mut eob = false;
         let result;
 
-        if self.finished() {
+        if self.errored() {
+            return Err(InternalErr::DataError)
+        } else if self.finished() {
             return Ok(());
         }
 

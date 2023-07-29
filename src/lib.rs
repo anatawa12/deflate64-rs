@@ -72,6 +72,8 @@ enum InflaterState {
     //ReadingFooter = 22,
     //VerifyingFooter = 23,
     Done = 24, // Finished
+
+    DataErrored = 100,
 }
 
 impl std::ops::Sub for InflaterState {
