@@ -338,7 +338,7 @@ impl InflaterManaged {
                     // TODO: optimize this!!!
                     symbol = self
                         .literal_length_tree
-                        .as_mut()
+                        .as_ref()
                         .unwrap()
                         .get_next_symbol(input)?;
 
@@ -392,7 +392,7 @@ impl InflaterManaged {
                     if self.block_type == BlockType::Dynamic {
                         let bits = self
                             .distance_tree
-                            .as_mut()
+                            .as_ref()
                             .unwrap()
                             .get_next_symbol(input)?;
                         self.distance_code = bits;
@@ -506,7 +506,7 @@ impl InflaterManaged {
                         if self.state == InflaterState::ReadingTreeCodesBefore {
                             self.length_code = self
                                 .code_length_tree
-                                .as_mut()
+                                .as_ref()
                                 .unwrap()
                                 .get_next_symbol(input)?;
                         }

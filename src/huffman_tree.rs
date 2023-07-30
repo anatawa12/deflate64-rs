@@ -247,7 +247,7 @@ impl HuffmanTree {
         Ok(())
     }
 
-    pub fn get_next_symbol(&mut self, input: &mut InputBuffer) -> Result<u16, InternalErr> {
+    pub fn get_next_symbol(&self, input: &mut InputBuffer) -> Result<u16, InternalErr> {
         // Try to load 16 bits into input buffer if possible and get the bit_buffer value.
         // If there aren't 16 bits available we will return all we have in the
         // input buffer.
