@@ -8,8 +8,6 @@ pub(crate) struct HuffmanTree {
     left: Box<[i16]>,
     right: Box<[i16]>,
     code_length_array: Box<[u8]>,
-    #[cfg(debug_assertions)]
-    code_array_debug: Box<[u32]>,
     table_mask: i32,
 }
 
@@ -59,8 +57,6 @@ impl HuffmanTree {
             left,
             right,
             code_length_array,
-            #[cfg(debug_assertions)]
-            code_array_debug: Box::new([]),
             table_mask,
         };
 
@@ -129,10 +125,6 @@ impl HuffmanTree {
 
     fn create_table(&mut self) {
         let code_array = self.calculate_huffman_code();
-        #[cfg(debug_assertions)]
-        {
-            self.code_array_debug = Box::new(code_array);
-        }
 
         let mut avail = self.code_length_array.len() as i16;
 
