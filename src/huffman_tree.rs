@@ -37,35 +37,50 @@ impl HuffmanTree {
     pub(crate) const END_OF_BLOCK_CODE: usize = 256;
     pub(crate) const NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS: usize = 19;
 
-    pub fn static_literal_length_tree() -> Self {
-        unsafe {
-            HuffmanTree::new(&Self::get_static_literal_tree_length()).unwrap_unchecked()
+    pub fn invalid() -> Self {
+        HuffmanTree {
+            table_bits: Default::default(),
+            code_lengths_length: Default::default(),
+            table: [0i16; 1 << Self::MAX_TABLE_BITS],
+            left: [0i16; Self::MAX_CODE_LENGTHS * 2],
+            right: [0i16; Self::MAX_CODE_LENGTHS * 2],
+            code_length_array: [0u8; Self::MAX_CODE_LENGTHS],
+            table_mask: Default::default(),
         }
+    }
+
+    pub fn static_literal_length_tree() -> Self {
+        unsafe { HuffmanTree::new(&Self::get_static_literal_tree_length()).unwrap_unchecked() }
     }
 
     pub fn static_distance_tree() -> Self {
-        unsafe { 
-            HuffmanTree::new(&Self::get_static_distance_tree_length()).unwrap_unchecked()
-        }
+        unsafe { HuffmanTree::new(&Self::get_static_distance_tree_length()).unwrap_unchecked() }
     }
 
-    pub fn new(code_lengths: &[u8]) -> Result<HuffmanTree, InternalErr> {
+    fn assert_code_lengths_len(len: usize) {
         debug_assert!(
-            code_lengths.len() == Self::MAX_LITERAL_TREE_ELEMENTS
-                || code_lengths.len() == Self::MAX_DIST_TREE_ELEMENTS
-                || code_lengths.len() == Self::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS,
+            len == Self::MAX_LITERAL_TREE_ELEMENTS
+                || len == Self::MAX_DIST_TREE_ELEMENTS
+                || len == Self::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS,
             "we only expect three kinds of Length here"
         );
-        let code_lengths_length = code_lengths.len();
+    }
 
-        let table_bits = if code_lengths_length == Self::MAX_LITERAL_TREE_ELEMENTS {
+    fn table_bits_for_code_length(code_lengths_length: usize) -> u8 {
+        if code_lengths_length == Self::MAX_LITERAL_TREE_ELEMENTS {
             // bits for Literal/Length tree table
             9
         } else {
             // bits for distance tree table and code length tree table
             7
-        };
-        let table_mask = (1 << table_bits) - 1;
+        }
+    }
+
+    pub fn new(code_lengths: &[u8]) -> Result<HuffmanTree, InternalErr> {
+        Self::assert_code_lengths_len(code_lengths.len());
+        let code_lengths_length = code_lengths.len();
+
+        let table_bits = Self::table_bits_for_code_length(code_lengths_length);
 
         // I need to find proof that left and right array will always be
         // enough. I think they are.
@@ -81,12 +96,26 @@ impl HuffmanTree {
                 buffer[..code_lengths.len()].copy_from_slice(code_lengths);
                 buffer
             },
-            table_mask,
+            table_mask: (1 << table_bits) - 1,
         };
 
         instance.create_table()?;
 
         Ok(instance)
+    }
+
+    pub fn new_in_place(&mut self, code_lengths: &[u8]) -> Result<(), InternalErr> {
+        Self::assert_code_lengths_len(code_lengths.len());
+        self.table_bits = Self::table_bits_for_code_length(code_lengths.len());
+        self.table.fill(0);
+        self.left.fill(0);
+        self.right.fill(0);
+        self.code_lengths_length = code_lengths.len() as u16;
+        self.code_length_array[..code_lengths.len()].copy_from_slice(code_lengths);
+        self.code_length_array[code_lengths.len()..].fill(0);
+        self.table_mask = (1 << self.table_bits) - 1;
+
+        self.create_table()
     }
 
     // Generate the array contains huffman codes lengths for static huffman tree.
@@ -101,7 +130,7 @@ impl HuffmanTree {
         return literal_tree_length;
     }
 
-    fn get_static_distance_tree_length() -> [u8; Self::MAX_DIST_TREE_ELEMENTS] {
+    const fn get_static_distance_tree_length() -> [u8; Self::MAX_DIST_TREE_ELEMENTS] {
         return [5u8; Self::MAX_DIST_TREE_ELEMENTS];
     }
 
@@ -248,6 +277,7 @@ impl HuffmanTree {
     }
 
     pub fn get_next_symbol(&self, input: &mut InputBuffer) -> Result<u16, InternalErr> {
+        assert_ne!(self.table_bits, 0, "invalid table");
         // Try to load 16 bits into input buffer if possible and get the bit_buffer value.
         // If there aren't 16 bits available we will return all we have in the
         // input buffer.

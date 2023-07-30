@@ -34,14 +34,14 @@ static STATIC_DISTANCE_TREE_TABLE: &'static [u8] = &[
 ];
 
 /// The streaming Inflater for deflate64
-/// 
+///
 /// This struct has big buffer so It's not recommended to move this struct.
 #[derive(Debug)]
 pub struct InflaterManaged {
     output: OutputWindow,
     bits: BitsBuffer,
-    literal_length_tree: Option<HuffmanTree>,
-    distance_tree: Option<HuffmanTree>,
+    literal_length_tree: HuffmanTree,
+    distance_tree: HuffmanTree,
 
     state: InflaterState,
     bfinal: bool,
@@ -66,7 +66,7 @@ pub struct InflaterManaged {
     code_list: [u8; HuffmanTree::MAX_LITERAL_TREE_ELEMENTS + HuffmanTree::MAX_DIST_TREE_ELEMENTS], // temporary array to store the code length for literal/Length and distance
     code_length_tree_code_length: [u8; HuffmanTree::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS],
     deflate64: bool,
-    code_length_tree: Option<HuffmanTree>,
+    code_length_tree: HuffmanTree,
     uncompressed_size: usize,
     current_inflated_count: usize,
 }
@@ -83,12 +83,12 @@ impl InflaterManaged {
             output: OutputWindow::new(),
             bits: BitsBuffer::new(),
 
-            literal_length_tree: None,
+            literal_length_tree: HuffmanTree::invalid(),
             code_list: [0u8; HuffmanTree::MAX_LITERAL_TREE_ELEMENTS
                 + HuffmanTree::MAX_DIST_TREE_ELEMENTS],
             code_length_tree_code_length: [0u8; HuffmanTree::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS],
             deflate64: true,
-            code_length_tree: None,
+            code_length_tree: HuffmanTree::invalid(),
             uncompressed_size,
             state: InflaterState::ReadingBFinal, // start by reading BFinal bit
             bfinal: false,
@@ -103,7 +103,7 @@ impl InflaterManaged {
             distance_code_count: 0,
             code_length_code_count: 0,
             code_array_size: 0,
-            distance_tree: None,
+            distance_tree: HuffmanTree::invalid(),
             length_code: 0,
             current_inflated_count: 0,
         }
@@ -128,7 +128,7 @@ impl InflaterManaged {
     }
 
     /// Try to decompress from `input` to `output`.
-    /// 
+    ///
     /// This will decompress data until `output` is full, `input` is empty,
     /// the end if the deflate64 stream is hit, or there is error data in the deflate64 stream.
     pub fn inflate(&mut self, input: &[u8], mut output: &mut [u8]) -> InflateResult {
@@ -192,7 +192,7 @@ impl InflaterManaged {
         let result;
 
         if self.errored() {
-            return Err(InternalErr::DataError)
+            return Err(InternalErr::DataError);
         } else if self.finished() {
             return Ok(());
         }
@@ -215,8 +215,8 @@ impl InflaterManaged {
                     self.state = InflaterState::ReadingNumLitCodes;
                 }
                 BlockType::Static => {
-                    self.literal_length_tree = Some(HuffmanTree::static_literal_length_tree());
-                    self.distance_tree = Some(HuffmanTree::static_distance_tree());
+                    self.literal_length_tree = HuffmanTree::static_literal_length_tree();
+                    self.distance_tree = HuffmanTree::static_distance_tree();
                     self.state = InflaterState::DecodeTop;
                 }
                 BlockType::Uncompressed => {
@@ -336,11 +336,7 @@ impl InflaterManaged {
                     // decode an element from the literal tree
 
                     // TODO: optimize this!!!
-                    symbol = self
-                        .literal_length_tree
-                        .as_ref()
-                        .unwrap()
-                        .get_next_symbol(input)?;
+                    symbol = self.literal_length_tree.get_next_symbol(input)?;
 
                     if symbol < 256 {
                         // literal
@@ -390,11 +386,7 @@ impl InflaterManaged {
                 }
                 InflaterState::HaveFullLength => {
                     if self.block_type == BlockType::Dynamic {
-                        let bits = self
-                            .distance_tree
-                            .as_ref()
-                            .unwrap()
-                            .get_next_symbol(input)?;
+                        let bits = self.distance_tree.get_next_symbol(input)?;
                         self.distance_code = bits;
                     } else {
                         // get distance code directly for static block
@@ -492,8 +484,8 @@ impl InflaterManaged {
                     }
 
                     // create huffman tree for code length
-                    self.code_length_tree =
-                        Some(HuffmanTree::new(&self.code_length_tree_code_length)?);
+                    self.code_length_tree
+                        .new_in_place(&self.code_length_tree_code_length)?;
                     self.code_array_size =
                         self.literal_length_code_count + self.distance_code_count;
                     self.loop_counter = 0; // reset loop count
@@ -504,11 +496,7 @@ impl InflaterManaged {
                 InflaterState::ReadingTreeCodesBefore | InflaterState::ReadingTreeCodesAfter => {
                     while self.loop_counter < self.code_array_size {
                         if self.state == InflaterState::ReadingTreeCodesBefore {
-                            self.length_code = self
-                                .code_length_tree
-                                .as_ref()
-                                .unwrap()
-                                .get_next_symbol(input)?;
+                            self.length_code = self.code_length_tree.get_next_symbol(input)?;
                         }
 
                         // The alphabet for code lengths is as follows:
@@ -615,8 +603,10 @@ impl InflaterManaged {
             return Err(InternalErr::DataError); // InvalidDataException
         }
 
-        self.literal_length_tree = Some(HuffmanTree::new(&literal_tree_code_length)?);
-        self.distance_tree = Some(HuffmanTree::new(&distance_tree_code_length)?);
+        self.literal_length_tree
+            .new_in_place(&literal_tree_code_length)?;
+        self.distance_tree
+            .new_in_place(&distance_tree_code_length)?;
         self.state = InflaterState::DecodeTop;
         return Ok(());
     }
