@@ -493,7 +493,7 @@ impl InflaterManaged {
 
                     // create huffman tree for code length
                     self.code_length_tree =
-                        Some(HuffmanTree::new(&self.code_length_tree_code_length));
+                        Some(HuffmanTree::new(&self.code_length_tree_code_length)?);
                     self.code_array_size =
                         self.literal_length_code_count + self.distance_code_count;
                     self.loop_counter = 0; // reset loop count
@@ -615,8 +615,8 @@ impl InflaterManaged {
             return Err(InternalErr::DataError); // InvalidDataException
         }
 
-        self.literal_length_tree = Some(HuffmanTree::new(&literal_tree_code_length));
-        self.distance_tree = Some(HuffmanTree::new(&distance_tree_code_length));
+        self.literal_length_tree = Some(HuffmanTree::new(&literal_tree_code_length)?);
+        self.distance_tree = Some(HuffmanTree::new(&distance_tree_code_length)?);
         self.state = InflaterState::DecodeTop;
         return Ok(());
     }

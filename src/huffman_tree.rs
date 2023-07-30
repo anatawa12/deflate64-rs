@@ -38,14 +38,18 @@ impl HuffmanTree {
     pub(crate) const NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS: usize = 19;
 
     pub fn static_literal_length_tree() -> Self {
-        return HuffmanTree::new(&Self::get_static_literal_tree_length());
+        unsafe {
+            HuffmanTree::new(&Self::get_static_literal_tree_length()).unwrap_unchecked()
+        }
     }
 
     pub fn static_distance_tree() -> Self {
-        return HuffmanTree::new(&Self::get_static_distance_tree_length());
+        unsafe { 
+            HuffmanTree::new(&Self::get_static_distance_tree_length()).unwrap_unchecked()
+        }
     }
 
-    pub fn new(code_lengths: &[u8]) -> HuffmanTree {
+    pub fn new(code_lengths: &[u8]) -> Result<HuffmanTree, InternalErr> {
         debug_assert!(
             code_lengths.len() == Self::MAX_LITERAL_TREE_ELEMENTS
                 || code_lengths.len() == Self::MAX_DIST_TREE_ELEMENTS
@@ -80,9 +84,9 @@ impl HuffmanTree {
             table_mask,
         };
 
-        instance.create_table();
+        instance.create_table()?;
 
-        instance
+        Ok(instance)
     }
 
     // Generate the array contains huffman codes lengths for static huffman tree.
@@ -143,7 +147,7 @@ impl HuffmanTree {
         return code;
     }
 
-    fn create_table(&mut self) {
+    fn create_table(&mut self) -> Result<(), InternalErr> {
         let code_array = self.calculate_huffman_code();
 
         let mut avail = get!(self.code_length_array).len() as i16;
@@ -176,8 +180,7 @@ impl HuffmanTree {
                     //
                     let increment = 1 << len;
                     if start >= increment {
-                        //throw new InvalidDataException(SR.InvalidHuffmanData);
-                        panic!("InvalidHuffmanData");
+                        return Err(InternalErr::DataError); // InvalidHuffmanData
                     }
 
                     // Note the bits in the table are reverted.
@@ -213,7 +216,7 @@ impl HuffmanTree {
 
                         if value > 0 {
                             // prevent an IndexOutOfRangeException from array[index]
-                            panic!("InvalidHuffmanData");
+                            return Err(InternalErr::DataError); // InvalidHuffmanData
                         }
 
                         debug_assert!(
@@ -240,6 +243,8 @@ impl HuffmanTree {
                 }
             }
         }
+
+        Ok(())
     }
 
     pub fn get_next_symbol(&mut self, input: &mut InputBuffer) -> Result<u16, InternalErr> {
@@ -276,7 +281,7 @@ impl HuffmanTree {
 
         // huffman code lengths must be at least 1 bit long
         if code_length <= 0 {
-            panic!("InvalidHuffmanData");
+            return Err(InternalErr::DataError); // InvalidHuffmanData
         }
 
         //
