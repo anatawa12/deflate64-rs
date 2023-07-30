@@ -3,15 +3,35 @@ use crate::InternalErr;
 
 #[derive(Debug)]
 pub(crate) struct HuffmanTree {
-    table_bits: i32,
-    table: Box<[i16]>,
-    left: Box<[i16]>,
-    right: Box<[i16]>,
-    code_length_array: Box<[u8]>,
-    table_mask: i32,
+    table_bits: u8,
+    code_lengths_length: u16,
+    table: [i16; 1 << Self::MAX_TABLE_BITS],
+    left: [i16; Self::MAX_CODE_LENGTHS * 2],
+    right: [i16; Self::MAX_CODE_LENGTHS * 2],
+    code_length_array: [u8; Self::MAX_CODE_LENGTHS],
+    table_mask: u16,
+}
+
+// because of lifetime conflict, we cannot use simple accessor method.
+macro_rules! get {
+    ($self: ident.table) => {
+        $self.table[..1 << $self.table_bits]
+    };
+    ($self: ident.left) => {
+        $self.left[..2 * $self.code_lengths_length as usize]
+    };
+    ($self: ident.right) => {
+        $self.right[..2 * $self.code_lengths_length as usize]
+    };
+    ($self: ident.code_length_array) => {
+        $self.code_length_array[..$self.code_lengths_length as usize]
+    };
 }
 
 impl HuffmanTree {
+    pub(crate) const MAX_CODE_LENGTHS: usize = 288;
+    pub(crate) const MAX_TABLE_BITS: usize = 9;
+
     pub(crate) const MAX_LITERAL_TREE_ELEMENTS: usize = 288;
     pub(crate) const MAX_DIST_TREE_ELEMENTS: usize = 32;
     pub(crate) const END_OF_BLOCK_CODE: usize = 256;
@@ -32,9 +52,9 @@ impl HuffmanTree {
                 || code_lengths.len() == Self::NUMBER_OF_CODE_LENGTH_TREE_ELEMENTS,
             "we only expect three kinds of Length here"
         );
-        let code_length_array = code_lengths.to_vec().into_boxed_slice();
+        let code_lengths_length = code_lengths.len();
 
-        let table_bits = if code_length_array.len() == Self::MAX_LITERAL_TREE_ELEMENTS {
+        let table_bits = if code_lengths_length == Self::MAX_LITERAL_TREE_ELEMENTS {
             // bits for Literal/Length tree table
             9
         } else {
@@ -43,20 +63,20 @@ impl HuffmanTree {
         };
         let table_mask = (1 << table_bits) - 1;
 
-        let table = vec![0i16; 1 << table_bits].into_boxed_slice();
-
         // I need to find proof that left and right array will always be
         // enough. I think they are.
 
-        let left = vec![0i16; 2 * code_length_array.len()].into_boxed_slice();
-        let right = vec![0i16; 2 * code_length_array.len()].into_boxed_slice();
-
         let mut instance = Self {
             table_bits,
-            table,
-            left,
-            right,
-            code_length_array,
+            table: [0; 1 << Self::MAX_TABLE_BITS],
+            left: [0; Self::MAX_CODE_LENGTHS * 2],
+            right: [0; Self::MAX_CODE_LENGTHS * 2],
+            code_lengths_length: code_lengths_length as u16,
+            code_length_array: {
+                let mut buffer = [0u8; Self::MAX_CODE_LENGTHS];
+                buffer[..code_lengths.len()].copy_from_slice(code_lengths);
+                buffer
+            },
             table_mask,
         };
 
@@ -99,7 +119,7 @@ impl HuffmanTree {
 
     fn calculate_huffman_code(&self) -> [u32; Self::MAX_LITERAL_TREE_ELEMENTS] {
         let mut bit_length_count = [0u32; 17];
-        for &code_length in self.code_length_array.iter() {
+        for &code_length in get!(self.code_length_array).iter() {
             bit_length_count[code_length as usize] += 1;
         }
         bit_length_count[0] = 0; // clear count for length 0
@@ -113,7 +133,7 @@ impl HuffmanTree {
         }
 
         let mut code = [0u32; Self::MAX_LITERAL_TREE_ELEMENTS];
-        for (i, &len) in self.code_length_array.iter().enumerate() {
+        for (i, &len) in get!(self.code_length_array).iter().enumerate() {
             if len > 0 {
                 code[i] = Self::bit_reverse(next_code[len as usize], len as usize);
                 next_code[len as usize] += 1;
@@ -126,14 +146,14 @@ impl HuffmanTree {
     fn create_table(&mut self) {
         let code_array = self.calculate_huffman_code();
 
-        let mut avail = self.code_length_array.len() as i16;
+        let mut avail = get!(self.code_length_array).len() as i16;
 
-        for (ch, &len) in self.code_length_array.iter().enumerate() {
+        for (ch, &len) in get!(self.code_length_array).iter().enumerate() {
             if len > 0 {
                 // start value (bit reversed)
                 let mut start = code_array[ch] as usize;
 
-                if len as i32 <= self.table_bits {
+                if len <= self.table_bits {
                     // If a particular symbol is shorter than nine bits,
                     // then that symbol's translation is duplicated
                     // in all those entries that start with that symbol's bits.
@@ -161,16 +181,16 @@ impl HuffmanTree {
                     }
 
                     // Note the bits in the table are reverted.
-                    let locs = 1 << (self.table_bits - len as i32);
+                    let locs = 1 << (self.table_bits - len);
                     for _ in 0..locs {
-                        self.table[start] = ch as i16;
+                        get!(self.table)[start] = ch as i16;
                         start += increment;
                     }
                 } else {
                     // For any code which has length longer than num_elements,
                     // build a binary tree.
 
-                    let mut overflow_bits = len as i32 - self.table_bits; // the nodes we need to respent the data.
+                    let mut overflow_bits = len - self.table_bits; // the nodes we need to respent the data.
                     let mut code_bit_mask = 1 << self.table_bits; // mask to get current bit (the bits can't fit in the table)
 
                     // the left, right table is used to repesent the
@@ -179,7 +199,7 @@ impl HuffmanTree {
                     // This is in place to avoid bloating the table if there are
                     // a few ones with long code.
                     let mut index = start & ((1 << self.table_bits) - 1);
-                    let mut array = &mut self.table;
+                    let mut array = &mut get!(self.table);
 
                     while {
                         let mut value = array[index];
@@ -203,10 +223,10 @@ impl HuffmanTree {
 
                         if (start & code_bit_mask) == 0 {
                             // if current bit is 0, go change the left array
-                            array = &mut self.left;
+                            array = &mut get!(self.left);
                         } else {
                             // if current bit is 1, set value in the right array
-                            array = &mut self.right;
+                            array = &mut get!(self.right);
                         }
                         index = -value as usize; // go to next node
 
@@ -241,9 +261,9 @@ impl HuffmanTree {
             while {
                 symbol = -symbol;
                 if (bit_buffer & mask) == 0 {
-                    symbol = self.left[symbol as usize];
+                    symbol = get!(self.left)[symbol as usize];
                 } else {
-                    symbol = self.right[symbol as usize];
+                    symbol = get!(self.right)[symbol as usize];
                 }
                 mask <<= 1;
                 symbol < 0
@@ -252,7 +272,7 @@ impl HuffmanTree {
 
         debug_assert!(symbol >= 0);
 
-        let code_length = self.code_length_array[symbol as usize] as i32;
+        let code_length = get!(self.code_length_array)[symbol as usize] as i32;
 
         // huffman code lengths must be at least 1 bit long
         if code_length <= 0 {
