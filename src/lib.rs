@@ -10,8 +10,10 @@ mod huffman_tree;
 mod inflater_managed;
 mod input_buffer;
 mod output_window;
+mod stream;
 
 pub use inflater_managed::InflaterManaged;
+pub use stream::Deflate64Decoder;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum BlockType {
