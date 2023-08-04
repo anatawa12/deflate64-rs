@@ -1,8 +1,7 @@
 // TODO: move this module to deflate64 crate
 
 use crate::InflaterManaged;
-use std::io;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read};
 
 /// The reader the decompresses deflate64 from another BufRead.
 pub struct Deflate64Decoder<R> {
