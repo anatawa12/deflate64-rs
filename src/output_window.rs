@@ -142,7 +142,13 @@ impl OutputWindow {
             copy_end = self.end;
             output = &mut output[..self.bytes_used];
         } else {
-            copy_end = (self.end.overflowing_sub(self.bytes_used).0.overflowing_add(output.len()).0) & WINDOW_MASK;
+            #[rustfmt::skip]
+            let _ = {
+                copy_end = (self.end
+                    .overflowing_sub(self.bytes_used).0
+                    .overflowing_add(output.len()).0)
+                    & WINDOW_MASK;
+            };
             // copy length of bytes
         }
 
