@@ -59,14 +59,10 @@ impl OutputWindow {
             if length <= distance {
                 // src, srcIdx, dst, dstIdx, len
                 // Array.copy(self._window, copy_start, self._window, self._end, length);
-                unsafe {
-                    // src, dst, cnt
-                    std::ptr::copy(
-                        self.window.as_ptr().add(copy_start),
-                        self.window.as_mut_ptr().add(self.end),
-                        length,
-                    )
-                }
+                self.window.copy_within(
+                    copy_start..(copy_start + length),
+                    self.end
+                );
                 self.end += length;
             } else {
                 // The referenced string may overlap the current
