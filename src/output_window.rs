@@ -59,10 +59,8 @@ impl OutputWindow {
             if length <= distance {
                 // src, srcIdx, dst, dstIdx, len
                 // Array.copy(self._window, copy_start, self._window, self._end, length);
-                self.window.copy_within(
-                    copy_start..(copy_start + length),
-                    self.end
-                );
+                self.window
+                    .copy_within(copy_start..(copy_start + length), self.end);
                 self.end += length;
             } else {
                 // The referenced string may overlap the current
