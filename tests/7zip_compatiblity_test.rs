@@ -4,7 +4,7 @@
 use std::ffi::OsString;
 use std::fs::File;
 use deflate64::Deflate64Decoder;
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::process::Command;
 use proptest::proptest;
 use tempfile::TempDir;
@@ -79,12 +79,10 @@ fn compress_with_7zip(data: &[u8]) -> Vec<u8> {
     let file_name_size = u16::from_le_bytes(header.file_name_len);
     let extra_field_size = u16::from_le_bytes(header.extra_field_len);
     assert_eq!(file_name_size as usize, TEST_FILE_NAME.len());
-    let mut file_name_buffer = vec![0u8; file_name_size as usize];
-    let mut extra_field_buffer = vec![0u8; extra_field_size as usize];
+    let mut file_name_buffer = [0u8; TEST_FILE_NAME.len()];
     zip_file.read_exact(&mut file_name_buffer).unwrap();
-    zip_file.read_exact(&mut extra_field_buffer).unwrap();
     assert_eq!(&file_name_buffer[..], TEST_FILE_NAME.as_bytes());
-    drop((file_name_buffer, extra_field_buffer));
+    zip_file.seek(SeekFrom::Current(extra_field_size as i64)).unwrap();
 
     let mut compressed_buffer = vec![0u8; compressed_size as usize];
     zip_file.read_exact(&mut compressed_buffer).unwrap();
