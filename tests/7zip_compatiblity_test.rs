@@ -96,7 +96,7 @@ fn compress_with_7zip(data: &[u8]) -> Vec<u8> {
     let mut compressed_buffer = vec![0u8; compressed_size as usize];
     zip_file.read_exact(&mut compressed_buffer).unwrap();
 
-    return compressed_buffer;
+    compressed_buffer
 }
 
 proptest! {
