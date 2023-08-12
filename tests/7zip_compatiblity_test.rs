@@ -59,19 +59,16 @@ fn compress_with_7zip(data: &[u8]) -> Vec<u8> {
         .arg("-mm=Deflate64")
         .arg(TEST_ZIP_NAME)
         .arg(TEST_FILE_NAME)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdin(Stdio::null())
         .current_dir(temp_dir.path())
-        .spawn()
+        .output()
         .unwrap();
 
-    if !seven_zip_process.wait().unwrap().success() {
-        let mut stdout = String::new();
-        let mut stderr = String::new();
-        seven_zip_process.stdout.unwrap().read_to_string(&mut stdout).unwrap();
-        seven_zip_process.stderr.unwrap().read_to_string(&mut stderr).unwrap();
-        panic!("7zip failure.\nstdout:\n{stdout}\n\nstderr:\n{stderr}");
+    if !seven_zip_process.status.success() {
+        panic!(
+            "7zip failure.\nstdout:\n{stdout}\n\nstderr:\n{stderr}",
+               stdout = String::from_utf8(seven_zip_process.stdout).unwrap(),
+               stderr = String::from_utf8(seven_zip_process.stderr).unwrap(),
+        );
     }
 
     // parse zip file
