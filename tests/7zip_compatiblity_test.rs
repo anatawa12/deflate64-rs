@@ -1,14 +1,14 @@
 #![cfg(feature = "__test-7zip")]
 //! This test compresses some random data with deflate64 using p7zip `7z` command and check decompression
 
+use bytemuck::{Pod, Zeroable};
+use deflate64::Deflate64Decoder;
+use proptest::proptest;
 use std::ffi::OsString;
 use std::fs::File;
-use deflate64::Deflate64Decoder;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::process::Command;
-use proptest::proptest;
 use tempfile::TempDir;
-use bytemuck::{Pod, Zeroable};
 
 const TEST_FILE_NAME: &'static str = "test.file";
 const TEST_ZIP_NAME: &'static str = "test.zip";
@@ -42,15 +42,17 @@ impl ZipLocalFileHeader {
 }
 
 fn compress_with_7zip(data: &[u8]) -> Vec<u8> {
-    let mut temp_dir = TempDir::new().unwrap();
+    let temp_dir = TempDir::new().unwrap();
 
     // write data to test file
-    File::create(temp_dir.path().join(TEST_FILE_NAME)).unwrap()
-        .write_all(data).unwrap();
+    File::create(temp_dir.path().join(TEST_FILE_NAME))
+        .unwrap()
+        .write_all(data)
+        .unwrap();
 
     let seven_zip = std::env::var_os("SEVEN_ZIP_PATH").unwrap_or_else(|| OsString::from("7z"));
 
-    let mut seven_zip_process = Command::new(seven_zip)
+    let seven_zip_process = Command::new(seven_zip)
         .arg("a")
         .arg("-mm=Deflate64")
         .arg(TEST_ZIP_NAME)
@@ -62,8 +64,8 @@ fn compress_with_7zip(data: &[u8]) -> Vec<u8> {
     if !seven_zip_process.status.success() {
         panic!(
             "7zip failure.\nstdout:\n{stdout}\n\nstderr:\n{stderr}",
-               stdout = String::from_utf8(seven_zip_process.stdout).unwrap(),
-               stderr = String::from_utf8(seven_zip_process.stderr).unwrap(),
+            stdout = String::from_utf8(seven_zip_process.stdout).unwrap(),
+            stderr = String::from_utf8(seven_zip_process.stderr).unwrap(),
         );
     }
 
@@ -75,14 +77,19 @@ fn compress_with_7zip(data: &[u8]) -> Vec<u8> {
     assert_eq!(u16::from_le_bytes(header.flags), 0);
     assert_eq!(u16::from_le_bytes(header.compression_method), 9);
     let compressed_size = u32::from_le_bytes(header.compressed_size);
-    assert_eq!(u32::from_le_bytes(header.uncompressed_size) as usize, data.len());
+    assert_eq!(
+        u32::from_le_bytes(header.uncompressed_size) as usize,
+        data.len()
+    );
     let file_name_size = u16::from_le_bytes(header.file_name_len);
     let extra_field_size = u16::from_le_bytes(header.extra_field_len);
     assert_eq!(file_name_size as usize, TEST_FILE_NAME.len());
     let mut file_name_buffer = [0u8; TEST_FILE_NAME.len()];
     zip_file.read_exact(&mut file_name_buffer).unwrap();
     assert_eq!(&file_name_buffer[..], TEST_FILE_NAME.as_bytes());
-    zip_file.seek(SeekFrom::Current(extra_field_size as i64)).unwrap();
+    zip_file
+        .seek(SeekFrom::Current(extra_field_size as i64))
+        .unwrap();
 
     let mut compressed_buffer = vec![0u8; compressed_size as usize];
     zip_file.read_exact(&mut compressed_buffer).unwrap();
@@ -95,7 +102,7 @@ proptest! {
     fn decompress_compreesed_with_7zip(source_data in "\\PC{1000,}") {
         let source_data = source_data.as_bytes();
         let compressed = compress_with_7zip(&source_data);
-        
+
         let mut decoder = Deflate64Decoder::new(Cursor::new(compressed));
 
         let mut uncompressed_data = vec![];

@@ -36,9 +36,24 @@ jobs:
         run: cargo build --verbose --target ${{ matrix.target }} --all-features
       - name: Run tests
         run: cargo test --verbose --target ${{ matrix.target }} --all-features
+
+      - name: Test release build with debug assertions
+        run: cargo test --release --all-features
+        env:
+          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: true
+          CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: true
+
+      - name: Test release build without debug assertions
+        run: cargo test --release --all-features
+
       - name: Upload proptest regressions
         if: failure()
         uses: actions/upload-artifact@v3
         with:
           name: proptest-regressions
           path: tests/*.proptest-regressions
+
+      - name: Check format
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --no-deps

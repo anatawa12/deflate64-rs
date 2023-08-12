@@ -14,7 +14,7 @@ fn check_test_data() {
 }
 
 fn source_stream() -> &'static [u8] {
-    return &ZIP_FILE_DATA[BINARY_WAV_DATA_OFFSET..][..BINARY_WAV_COMPRESSED_SIZE];
+    &ZIP_FILE_DATA[BINARY_WAV_DATA_OFFSET..][..BINARY_WAV_COMPRESSED_SIZE]
 }
 
 #[test]

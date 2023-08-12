@@ -59,10 +59,8 @@ impl OutputWindow {
             if length <= distance {
                 // src, srcIdx, dst, dstIdx, len
                 // Array.copy(self._window, copy_start, self._window, self._end, length);
-                self.window.copy_within(
-                    copy_start..(copy_start + length),
-                    self.end
-                );
+                self.window
+                    .copy_within(copy_start..(copy_start + length), self.end);
                 self.end += length;
             } else {
                 // The referenced string may overlap the current
@@ -116,7 +114,7 @@ impl OutputWindow {
 
         self.end = (self.end + copied) & WINDOW_MASK;
         self.bytes_used += copied;
-        return copied;
+        copied
     }
 
     /// <summary>Free space in output window.</summary>
@@ -139,7 +137,7 @@ impl OutputWindow {
             output = &mut output[..self.bytes_used];
         } else {
             #[rustfmt::skip]
-            let _ = {
+            {
                 copy_end = (self.end
                     .overflowing_sub(self.bytes_used).0
                     .overflowing_add(output.len()).0)
@@ -160,6 +158,6 @@ impl OutputWindow {
         output.copy_from_slice(&self.window[copy_end - output.len()..][..output.len()]);
         self.bytes_used -= copied;
         //debug_assert!(self.bytes_used >= 0, "check this function and find why we copied more bytes than we have");
-        return copied;
+        copied
     }
 }
