@@ -42,7 +42,7 @@ impl ZipLocalFileHeader {
 }
 
 fn compress_with_7zip(data: &[u8]) -> Vec<u8> {
-    let mut temp_dir = TempDir::new().unwrap();
+    let temp_dir = TempDir::new().unwrap();
 
     // write data to test file
     File::create(temp_dir.path().join(TEST_FILE_NAME))
@@ -52,7 +52,7 @@ fn compress_with_7zip(data: &[u8]) -> Vec<u8> {
 
     let seven_zip = std::env::var_os("SEVEN_ZIP_PATH").unwrap_or_else(|| OsString::from("7z"));
 
-    let mut seven_zip_process = Command::new(seven_zip)
+    let seven_zip_process = Command::new(seven_zip)
         .arg("a")
         .arg("-mm=Deflate64")
         .arg(TEST_ZIP_NAME)
