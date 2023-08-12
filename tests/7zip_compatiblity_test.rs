@@ -5,16 +5,16 @@ use std::ffi::OsString;
 use std::fs::File;
 use deflate64::Deflate64Decoder;
 use std::io::{Cursor, Read, Write};
-use std::mem::size_of;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use proptest::proptest;
 use tempfile::TempDir;
+use bytemuck::{Pod, Zeroable};
 
 const TEST_FILE_NAME: &'static str = "test.file";
 const TEST_ZIP_NAME: &'static str = "test.zip";
 
-#[repr(packed)]
-#[derive(Default)]
+#[repr(C)]
+#[derive(Default, Pod, Copy, Clone, Zeroable)]
 struct ZipLocalFileHeader {
     signature: [u8; 4],
     version: [u8; 2],
@@ -37,12 +37,7 @@ impl ZipLocalFileHeader {
     }
 
     fn as_mut_bytes(&mut self) -> &mut [u8] {
-        unsafe {
-            std::slice::from_raw_parts_mut(
-                self as *mut Self as *mut u8,
-                size_of::<Self>()
-            )
-        }
+        bytemuck::bytes_of_mut(self)
     }
 }
 
