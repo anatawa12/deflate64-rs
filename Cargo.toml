@@ -19,3 +19,12 @@ exclude = [
 ]
 
 [dependencies]
+
+[features]
+# feature only for testing. this feature does not have any effect in final binary
+__test-7zip = []
+
+[dev-dependencies]
+bytemuck = { version = "1.13.1", features = ["derive"] }
+proptest = "1.2.0"
+tempfile = "3.7.1"
