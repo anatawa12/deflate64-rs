@@ -14,6 +14,7 @@ const TEST_FILE_NAME: &'static str = "test.file";
 const TEST_ZIP_NAME: &'static str = "test.zip";
 
 #[repr(packed)]
+#[derive(Default)]
 struct ZipLocalFileHeader {
     signature: [u8; 4],
     version: [u8; 2],
@@ -32,7 +33,7 @@ impl ZipLocalFileHeader {
     const SIGNATURE: [u8; 4] = [0x50, 0x4B, 0x03, 0x04];
 
     fn zero() -> Self {
-        unsafe { std::mem::zeroed() }
+        Default::default()
     }
 
     fn as_mut_bytes(&mut self) -> &mut [u8] {
