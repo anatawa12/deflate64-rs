@@ -1,4 +1,4 @@
-#![cfg(feature = "test-7zip")]
+#![cfg(feature = "__test-7zip")]
 //! This test compresses some random data with deflate64 using p7zip `7z` command and check decompression
 
 use std::ffi::OsString;
