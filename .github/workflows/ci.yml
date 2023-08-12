@@ -33,6 +33,12 @@ jobs:
         with:
           key: ${{ matrix.target }}
       - name: Build
-        run: cargo build --verbose --target ${{ matrix.target }}
+        run: cargo build --verbose --target ${{ matrix.target }} --all-features
       - name: Run tests
-        run: cargo test --verbose --target ${{ matrix.target }}
+        run: cargo test --verbose --target ${{ matrix.target }} --all-features
+      - name: Upload proptest regressions
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: proptest-regressions
+          path: tests/*.proptest-regressions

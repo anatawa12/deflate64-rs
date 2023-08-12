@@ -19,3 +19,11 @@ exclude = [
 ]
 
 [dependencies]
+
+[features]
+# feature only for testing. this feature does not have any effect in final binary
+test-7zip = []
+
+[dev-dependencies]
+proptest = "1.2.0"
+tempfile = "3.7.1"
