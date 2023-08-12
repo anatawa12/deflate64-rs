@@ -40,8 +40,8 @@ jobs:
       - name: Test release build with debug assertions
         run: cargo test --release --all-features
         env:
-          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 1
-          CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: 1
+          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: true
+          CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: true
 
       - name: Test release build without debug assertions
         run: cargo test --release --all-features
