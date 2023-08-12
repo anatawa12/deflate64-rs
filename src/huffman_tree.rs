@@ -113,11 +113,11 @@ impl HuffmanTree {
         literal_tree_length[144..][..112].fill(9);
         literal_tree_length[256..][..24].fill(7);
         literal_tree_length[280..][..8].fill(8);
-        return literal_tree_length;
+        literal_tree_length
     }
 
     const fn get_static_distance_tree_length() -> [u8; Self::MAX_DIST_TREE_ELEMENTS] {
-        return [5u8; Self::MAX_DIST_TREE_ELEMENTS];
+        [5u8; Self::MAX_DIST_TREE_ELEMENTS]
     }
 
     fn bit_reverse(mut code: u32, mut length: usize) -> u32 {
@@ -133,7 +133,7 @@ impl HuffmanTree {
             length > 0
         } {}
 
-        return new_code >> 1;
+        new_code >> 1
     }
 
     fn calculate_huffman_code(&self) -> [u32; Self::MAX_LITERAL_TREE_ELEMENTS] {
@@ -159,7 +159,7 @@ impl HuffmanTree {
             }
         }
 
-        return code;
+        code
     }
 
     fn create_table(&mut self) -> Result<(), InternalErr> {
@@ -172,7 +172,7 @@ impl HuffmanTree {
                 // start value (bit reversed)
                 let mut start = code_array[ch] as usize;
 
-                if len <= Self::TABLE_BITS as u8 {
+                if len <= Self::TABLE_BITS {
                     // If a particular symbol is shorter than nine bits,
                     // then that symbol's translation is duplicated
                     // in all those entries that start with that symbol's bits.
@@ -312,6 +312,6 @@ impl HuffmanTree {
         }
 
         input.skip_bits(code_length);
-        return Ok(symbol as u16);
+        Ok(symbol as u16)
     }
 }

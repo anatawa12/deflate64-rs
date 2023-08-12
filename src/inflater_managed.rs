@@ -5,30 +5,30 @@ use crate::*;
 use std::cmp::min;
 
 // Extra bits for length code 257 - 285.
-static EXTRA_LENGTH_BITS: &'static [u8] = &[
+static EXTRA_LENGTH_BITS: &[u8] = &[
     0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 16,
 ];
 
 // The base length for length code 257 - 285.
 // The formula to get the real length for a length code is lengthBase[code - 257] + (value stored in extraBits)
-static LENGTH_BASE: &'static [u8] = &[
+static LENGTH_BASE: &[u8] = &[
     3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131,
     163, 195, 227, 3,
 ];
 
 // The base distance for distance code 0 - 31
 // The real distance for a distance code is  distanceBasePosition[code] + (value stored in extraBits)
-static DISTANCE_BASE_POSITION: &'static [u16] = &[
+static DISTANCE_BASE_POSITION: &[u16] = &[
     1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537,
     2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577, 32769, 49153,
 ];
 
 // code lengths for code length alphabet is stored in following order
-static CODE_ORDER: &'static [u8] = &[
+static CODE_ORDER: &[u8] = &[
     16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15,
 ];
 
-static STATIC_DISTANCE_TREE_TABLE: &'static [u8] = &[
+static STATIC_DISTANCE_TREE_TABLE: &[u8] = &[
     0x00, 0x10, 0x08, 0x18, 0x04, 0x14, 0x0c, 0x1c, 0x02, 0x12, 0x0a, 0x1a, 0x06, 0x16, 0x0e, 0x1e,
     0x01, 0x11, 0x09, 0x19, 0x05, 0x15, 0x0d, 0x1d, 0x03, 0x13, 0x0b, 0x1b, 0x07, 0x17, 0x0f, 0x1f,
 ];
@@ -141,19 +141,17 @@ impl InflaterManaged {
             let mut copied = 0;
             if self.uncompressed_size == usize::MAX {
                 copied = self.output.copy_to(output);
+            } else if self.uncompressed_size > self.current_inflated_count {
+                let len = min(
+                    output.len(),
+                    self.uncompressed_size - self.current_inflated_count,
+                );
+                output = &mut output[..len];
+                copied = self.output.copy_to(output);
+                self.current_inflated_count += copied;
             } else {
-                if self.uncompressed_size > self.current_inflated_count {
-                    let len = min(
-                        output.len(),
-                        self.uncompressed_size - self.current_inflated_count,
-                    );
-                    output = &mut output[..len];
-                    copied = self.output.copy_to(output);
-                    self.current_inflated_count += copied;
-                } else {
-                    self.state = InflaterState::Done;
-                    self.output.clear_bytes_used();
-                }
+                self.state = InflaterState::Done;
+                self.output.clear_bytes_used();
             }
             if copied > 0 {
                 output = &mut output[copied..];
@@ -184,7 +182,7 @@ impl InflaterManaged {
 
         self.bits = input.bits;
         result.bytes_consumed = input.read_bytes;
-        return result;
+        result
     }
 
     fn decode(&mut self, input: &mut InputBuffer) -> Result<(), InternalErr> {
@@ -247,7 +245,7 @@ impl InflaterManaged {
         if eob && self.bfinal {
             self.state = InflaterState::Done;
         }
-        return result;
+        result
     }
 
     fn decode_uncompressed_block(
@@ -423,7 +421,7 @@ impl InflaterManaged {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     // Format of the dynamic block header:
@@ -608,6 +606,6 @@ impl InflaterManaged {
         self.distance_tree
             .new_in_place(&distance_tree_code_length)?;
         self.state = InflaterState::DecodeTop;
-        return Ok(());
+        Ok(())
     }
 }

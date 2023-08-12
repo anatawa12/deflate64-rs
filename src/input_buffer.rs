@@ -64,7 +64,7 @@ impl<'a> InputBuffer<'a> {
             }
         }
 
-        return true;
+        true
     }
 
     pub fn try_load_16bits(&mut self) -> u32 {
@@ -74,20 +74,18 @@ impl<'a> InputBuffer<'a> {
                 self.bits.bit_buffer |= (self.buffer[1] as u32) << (self.bits.bits_in_buffer + 8);
                 self.advance(2);
                 self.bits.bits_in_buffer += 16;
-            } else if self.buffer.len() != 0 {
+            } else if !self.buffer.is_empty() {
                 self.bits.bit_buffer |= (self.buffer[0] as u32) << self.bits.bits_in_buffer;
                 self.advance(1);
                 self.bits.bits_in_buffer += 8;
             }
-        } else if self.bits.bits_in_buffer < 16 {
-            if !self.buffer.is_empty() {
-                self.bits.bit_buffer |= (self.buffer[0] as u32) << self.bits.bits_in_buffer;
-                self.advance(1);
-                self.bits.bits_in_buffer += 8;
-            }
+        } else if self.bits.bits_in_buffer < 16 && !self.buffer.is_empty() {
+            self.bits.bit_buffer |= (self.buffer[0] as u32) << self.bits.bits_in_buffer;
+            self.advance(1);
+            self.bits.bits_in_buffer += 8;
         }
 
-        return self.bits.bit_buffer;
+        self.bits.bit_buffer
     }
 
     fn get_bit_mask(&self, count: i32) -> u32 {
@@ -104,7 +102,7 @@ impl<'a> InputBuffer<'a> {
         let result = (self.bits.bit_buffer & self.get_bit_mask(count)) as u16;
         self.bits.bit_buffer >>= count;
         self.bits.bits_in_buffer -= count;
-        return Ok(result);
+        Ok(result)
     }
 
     pub fn copy_to(&mut self, mut output: &mut [u8]) -> usize {
@@ -127,7 +125,7 @@ impl<'a> InputBuffer<'a> {
         let length = min(output.len(), self.buffer.len());
         output[..length].copy_from_slice(&self.buffer[..length]);
         self.advance(length);
-        return bytes_from_bit_buffer + length;
+        bytes_from_bit_buffer + length
     }
 
     pub fn needs_input(&self) -> bool {
