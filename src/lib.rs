@@ -11,6 +11,7 @@ mod inflater_managed;
 mod input_buffer;
 mod output_window;
 mod stream;
+mod utils;
 
 pub use inflater_managed::InflaterManaged;
 pub use stream::Deflate64Decoder;
@@ -122,6 +123,7 @@ impl InflateResult {
     }
 }
 
+#[derive(Debug)]
 enum InternalErr {
     DataNeeded,
     DataError,
