@@ -477,8 +477,8 @@ impl InflaterManaged {
                         self.loop_counter += 1;
                     }
 
-                    for i in self.code_length_code_count as usize..CODE_ORDER.len() {
-                        self.code_length_tree_code_length[CODE_ORDER[i] as usize] = 0;
+                    for &code_oder in &CODE_ORDER[self.code_length_code_count as usize..] {
+                        self.code_length_tree_code_length[code_oder as usize] = 0;
                     }
 
                     // create huffman tree for code length
