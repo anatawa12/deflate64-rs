@@ -42,3 +42,6 @@ jobs:
         with:
           name: proptest-regressions
           path: tests/*.proptest-regressions
+
+      - name: Check format
+        run: cargo fmt --check
