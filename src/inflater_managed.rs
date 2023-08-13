@@ -73,6 +73,7 @@ pub struct InflaterManaged {
 
 impl InflaterManaged {
     /// Initializes Inflater
+    #[allow(clippy::new_without_default)]
     #[inline]
     pub fn new() -> Self {
         Self::with_uncompressed_size(usize::MAX)
@@ -612,12 +613,5 @@ impl InflaterManaged {
             .new_in_place(&distance_tree_code_length)?;
         self.state = InflaterState::DecodeTop;
         Ok(())
-    }
-}
-
-impl Default for InflaterManaged {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
     }
 }
