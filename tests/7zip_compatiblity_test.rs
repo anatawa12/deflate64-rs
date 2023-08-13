@@ -1,4 +1,3 @@
-#![cfg(feature = "__test-7zip")]
 //! This test compresses some random data with deflate64 using p7zip `7z` command and check decompression
 
 use bytemuck::{Pod, Zeroable};
@@ -10,8 +9,8 @@ use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::process::Command;
 use tempfile::TempDir;
 
-const TEST_FILE_NAME: &'static str = "test.file";
-const TEST_ZIP_NAME: &'static str = "test.zip";
+const TEST_FILE_NAME: &str = "test.file";
+const TEST_ZIP_NAME: &str = "test.zip";
 
 #[repr(C)]
 #[derive(Default, Pod, Copy, Clone, Zeroable)]
@@ -99,9 +98,10 @@ fn compress_with_7zip(data: &[u8]) -> Vec<u8> {
 
 proptest! {
     #[test]
-    fn decompress_compreesed_with_7zip(source_data in "\\PC{1000,}") {
+    #[ignore = "requires `p7zip` command line tool"]
+    fn decompress_compressed_with_7zip(source_data in "\\PC{1000,}") {
         let source_data = source_data.as_bytes();
-        let compressed = compress_with_7zip(&source_data);
+        let compressed = compress_with_7zip(source_data);
 
         let mut decoder = Deflate64Decoder::new(Cursor::new(compressed));
 
