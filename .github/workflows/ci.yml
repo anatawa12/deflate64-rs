@@ -44,7 +44,7 @@ jobs:
           CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: true
 
       - name: Test release build without debug assertions
-        run: cargo test --release --all-features
+        run: cargo test --release --all-features -- --include-ignored
 
       - name: Upload proptest regressions
         if: failure()
