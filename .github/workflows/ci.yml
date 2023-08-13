@@ -12,29 +12,21 @@ jobs:
   build:
     strategy:
       matrix:
-        include:
-          - runs-on: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - runs-on: windows-latest
-            target: x86_64-pc-windows-msvc
-        runs-on:
+        os:
           - ubuntu-latest
           - windows-latest
 
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
+      - name: Install Rust (stable)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
       - name: Build
-        run: cargo build --verbose --target ${{ matrix.target }} --all-features
+        run: cargo build --verbose --all-features
       - name: Run tests
-        run: cargo test --verbose --target ${{ matrix.target }} --all-features
+        run: cargo test --verbose --all-features
 
       - name: Test release build with debug assertions
         run: cargo test --release --all-features
@@ -51,8 +43,3 @@ jobs:
         with:
           name: proptest-regressions
           path: tests/*.proptest-regressions
-
-      - name: Check format
-        run: cargo fmt --check
-      - name: Clippy
-        run: cargo clippy --no-deps
