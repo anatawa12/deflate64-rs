@@ -1,5 +1,4 @@
 use crate::input_buffer::InputBuffer;
-use crate::utils::ResultExt;
 use crate::InternalErr;
 
 #[derive(Debug)]
@@ -48,15 +47,11 @@ impl HuffmanTree {
     }
 
     pub fn static_literal_length_tree() -> Self {
-        unsafe {
-            HuffmanTree::new(&Self::get_static_literal_tree_length()).unwrap_unchecked_on_release()
-        }
+        HuffmanTree::new(&Self::get_static_literal_tree_length()).unwrap()
     }
 
     pub fn static_distance_tree() -> Self {
-        unsafe {
-            HuffmanTree::new(&Self::get_static_distance_tree_length()).unwrap_unchecked_on_release()
-        }
+        HuffmanTree::new(&Self::get_static_distance_tree_length()).unwrap()
     }
 
     fn assert_code_lengths_len(len: usize) {
