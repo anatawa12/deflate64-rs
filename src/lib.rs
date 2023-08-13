@@ -5,6 +5,7 @@
 //! [dotnet]: https://github.com/dotnet/runtime/tree/e5efd8010e19593298dc2c3ee15106d5aec5a924/src/libraries/System.IO.Compression/src/System/IO/Compression/DeflateManaged
 
 #![forbid(unsafe_code)]
+#![deny(rust_2018_idioms, nonstandard_style, future_incompatible)]
 
 mod huffman_tree;
 mod inflater_managed;
@@ -113,6 +114,7 @@ pub struct InflateResult {
 
 impl InflateResult {
     /// Creates `InflateResult` with zero bytes consumed and written, and no error.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             bytes_consumed: 0,

@@ -2,7 +2,7 @@ use crate::input_buffer::InputBuffer;
 use std::cmp::min;
 
 // With Deflate64 we can have up to a 65536 length as well as up to a 65538 distance. This means we need a Window that is at
-// least 131074 bytes long so we have space to retrieve up to a full 64kb in lookback and place it in our buffer without
+// least 131074 bytes long so we have space to retrieve up to a full 64kb in look-back and place it in our buffer without
 // overwriting existing data. OutputWindow requires that the WINDOW_SIZE be an exponent of 2, so we round up to 2^18.
 const WINDOW_SIZE: usize = 262144;
 const WINDOW_MASK: usize = 262143;
@@ -91,7 +91,7 @@ impl OutputWindow {
     /// Copy up to length of bytes from input directly.
     /// This is used for uncompressed block.
     /// </summary>
-    pub fn copy_from(&mut self, input: &mut InputBuffer, mut length: usize) -> usize {
+    pub fn copy_from(&mut self, input: &mut InputBuffer<'_>, mut length: usize) -> usize {
         length = min(
             min(length, WINDOW_SIZE - self.bytes_used),
             input.available_bytes(),
@@ -151,7 +151,7 @@ impl OutputWindow {
         if output.len() > copy_end {
             let tail_len = output.len() - copy_end;
             // this means we need to copy two parts separately
-            // copy the taillen bytes from the end of the output window
+            // copy the tail_len bytes from the end of the output window
             output[..tail_len].copy_from_slice(&self.window[WINDOW_SIZE - tail_len..][..tail_len]);
             output = &mut output[tail_len..][..copy_end];
         }
