@@ -203,10 +203,10 @@ impl HuffmanTree {
                     // For any code which has length longer than num_elements,
                     // build a binary tree.
 
-                    let mut overflow_bits = len - Self::TABLE_BITS; // the nodes we need to respent the data.
+                    let mut overflow_bits = len - Self::TABLE_BITS; // the nodes we need to represent the data.
                     let mut code_bit_mask = 1 << Self::TABLE_BITS; // mask to get current bit (the bits can't fit in the table)
 
-                    // the left, right table is used to repesent the
+                    // the left, right table is used to represent the
                     // the rest bits. When we got the first part (number bits.) and look at
                     // tbe table, we will need to follow the tree to find the real character.
                     // This is in place to avoid bloating the table if there are
@@ -257,7 +257,7 @@ impl HuffmanTree {
         Ok(())
     }
 
-    pub fn get_next_symbol(&self, input: &mut InputBuffer) -> Result<u16, InternalErr> {
+    pub fn get_next_symbol(&self, input: &mut InputBuffer<'_>) -> Result<u16, InternalErr> {
         assert_ne!(self.code_lengths_length, 0, "invalid table");
         // Try to load 16 bits into input buffer if possible and get the bit_buffer value.
         // If there aren't 16 bits available we will return all we have in the

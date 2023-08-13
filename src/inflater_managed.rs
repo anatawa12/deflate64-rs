@@ -1,7 +1,7 @@
 use crate::huffman_tree::HuffmanTree;
 use crate::input_buffer::{BitsBuffer, InputBuffer};
 use crate::output_window::OutputWindow;
-use crate::*;
+use crate::{array_copy, array_copy1, BlockType, InflateResult, InflaterState, InternalErr};
 use std::cmp::min;
 
 // Extra bits for length code 257 - 285.
@@ -73,6 +73,8 @@ pub struct InflaterManaged {
 
 impl InflaterManaged {
     /// Initializes Inflater
+    #[allow(clippy::new_without_default)]
+    #[inline]
     pub fn new() -> Self {
         Self::with_uncompressed_size(usize::MAX)
     }
@@ -185,7 +187,7 @@ impl InflaterManaged {
         result
     }
 
-    fn decode(&mut self, input: &mut InputBuffer) -> Result<(), InternalErr> {
+    fn decode(&mut self, input: &mut InputBuffer<'_>) -> Result<(), InternalErr> {
         let mut eob = false;
         let result;
 
@@ -250,7 +252,7 @@ impl InflaterManaged {
 
     fn decode_uncompressed_block(
         &mut self,
-        input: &mut InputBuffer,
+        input: &mut InputBuffer<'_>,
         end_of_block: &mut bool,
     ) -> Result<(), InternalErr> {
         *end_of_block = false;
@@ -318,7 +320,7 @@ impl InflaterManaged {
 
     fn decode_block(
         &mut self,
-        input: &mut InputBuffer,
+        input: &mut InputBuffer<'_>,
         end_of_block_code_seen: &mut bool,
     ) -> Result<(), InternalErr> {
         *end_of_block_code_seen = false;
@@ -336,6 +338,7 @@ impl InflaterManaged {
                     // TODO: optimize this!!!
                     symbol = self.literal_length_tree.get_next_symbol(input)?;
 
+                    #[allow(clippy::comparison_chain)]
                     if symbol < 256 {
                         // literal
                         self.output.write(symbol as u8);
@@ -447,7 +450,10 @@ impl InflaterManaged {
     // The code length repeat codes can cross from HLIT + 257 to the
     // HDIST + 1 code lengths.  In other words, all code lengths form
     // a single sequence of HLIT + HDIST + 258 values.
-    fn decode_dynamic_block_header(&mut self, input: &mut InputBuffer) -> Result<(), InternalErr> {
+    fn decode_dynamic_block_header(
+        &mut self,
+        input: &mut InputBuffer<'_>,
+    ) -> Result<(), InternalErr> {
         'switch: loop {
             match self.state {
                 InflaterState::ReadingNumLitCodes => {
