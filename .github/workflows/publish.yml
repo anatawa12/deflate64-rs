@@ -31,8 +31,37 @@ jobs:
           fi
           VERSION="$(version-unsnapshot "$VERSION")"
           gh-set-output version "$VERSION"
+          gh-export-variable VERSION "$VERSION"
           set-version "$VERSION"
           cargo metadata --format-version=1 > /dev/null
+
+      # region changelog
+      - name: Create Changelog
+        id: changelog
+        uses: anatawa12/sh-actions/changelog/prepare-release@master
+        with:
+          version: ${{ env.VERSION }}
+          tag-prefix: v
+          release-note-heading: |
+            Version ${{ env.VERSION }}
+            ---
+      - name: Upload CHANGELOG.md
+        uses: actions/upload-artifact@v3
+        with:
+          name: CHANGELOG
+          path: CHANGELOG.md
+      - run: cp "${{ steps.changelog.outputs.release-note }}" release-note.md
+      - name: Upload release note
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-note
+          path: release-note.md
+      - run: rm release-note.md
+      # endregion changelog
+
+      - name: commit new release
+        id: commit
+        run: |-
           # commit & tag
           git add .
           git commit -m "v$VERSION"
@@ -79,10 +108,6 @@ jobs:
       - uses: snow-actions/git-config-user@v1.0.0
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: actions/download-artifact@v3
-        with:
-          path: outputs
-
       - name: Push tag
         env:
           VERSION: ${{ needs.pre-build.outputs.version }}
@@ -96,14 +121,21 @@ jobs:
           git log --all --graph
           git push -u origin master
 
+      - name: download release note for this release
+        uses: actions/download-artifact@v3
+        id: download-release-note
+        with:
+          name: release-note
+
       - name: create release
         shell: bash
         env:
           VERSION: ${{ needs.pre-build.outputs.version }}
           GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTE: ${{ steps.download-release-note.outputs.download-path }}/release-note.md
         run: |-
           sleep 1
-          gh release create --verify-tag "v$VERSION"
+          gh release create --verify-tag "v$VERSION" --notes-file "$RELEASE_NOTE"
 
       - name: Update To Next Version
         run: |
@@ -111,7 +143,7 @@ jobs:
           VERSION="$(version-next "$VERSION")"
           set-version "$(version-snapshot "$VERSION")"
           cargo metadata --format-version=1 > /dev/null
-          git add .
+          git add Cargo.toml
           git commit -m "prepare for next version: $VERSION"
           git push
           git push --delete origin releasing
