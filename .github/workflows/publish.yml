@@ -62,7 +62,7 @@ jobs:
         id: commit
         run: |-
           # commit & tag
-          git add .
+          git add Cargo.toml CHANGELOG.md
           git commit -m "v$VERSION"
           git branch releasing
           git push -u origin releasing
