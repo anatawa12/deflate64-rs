@@ -58,6 +58,10 @@ jobs:
       - run: rm release-note.md
       # endregion changelog
 
+      # check for unexpected breaking ABI changes
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+
       - name: commit new release
         id: commit
         run: |-
