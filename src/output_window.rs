@@ -109,7 +109,7 @@ impl OutputWindow {
             }
         } else {
             // only one copy is needed if there is no wrap around.
-            copied = input.copy_to(&mut self.window[self.end..][..tail_len]);
+            copied = input.copy_to(&mut self.window[self.end..][..length]);
         }
 
         self.end = (self.end + copied) & WINDOW_MASK;
