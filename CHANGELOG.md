@@ -16,9 +16,12 @@ The format is based on [Keep a Changelog].
 ### Removed
 
 ### Fixed
-- Overflow substract with some archive `#14`
 
 ### Security
+
+## [0.1.6] - 2023-10-15
+### Fixed
+- Overflow substract with some archive [`#14`](https://github.com/anatawa12/deflate64-rs/pull/14)
 
 ## [0.1.5] - 2023-08-19
 ### Added
@@ -58,7 +61,8 @@ The format is based on [Keep a Changelog].
 ### Added
 - Initial Deflate64 implementation
 
-[Unreleased]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.2...v0.1.3
