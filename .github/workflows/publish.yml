@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: anatawa12/something-releaser@v2
       - uses: snow-actions/git-config-user@v1.0.0
 
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [pre-build]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: 'releasing'
           fetch-depth: 1
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [publish-crates-io, pre-build]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: 'releasing'
           fetch-depth: 2
