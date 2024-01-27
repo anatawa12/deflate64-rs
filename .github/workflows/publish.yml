@@ -45,13 +45,13 @@ jobs:
             Version ${{ env.VERSION }}
             ---
       - name: Upload CHANGELOG.md
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: CHANGELOG
           path: CHANGELOG.md
       - run: cp "${{ steps.changelog.outputs.release-note }}" release-note.md
       - name: Upload release note
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: release-note
           path: release-note.md
