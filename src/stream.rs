@@ -32,6 +32,7 @@ impl<R> Deflate64Decoder<R> {
         self.inner
     }
 
+    /// Returns mutable reference to innner BufRead instance
     pub fn get_mut(&mut self) -> &mut R {
         &mut self.inner
     }
