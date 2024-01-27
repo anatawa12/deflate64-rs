@@ -31,6 +31,10 @@ impl<R> Deflate64Decoder<R> {
     pub fn into_inner(self) -> R {
         self.inner
     }
+
+    pub fn get_mut(&mut self) -> &mut R {
+        &mut self.inner
+    }
 }
 
 impl<R: BufRead> Read for Deflate64Decoder<R> {
