@@ -244,9 +244,7 @@ impl HuffmanTree {
                         }
                         index = -value as usize; // go to next node
 
-                        if index
-                            >= 2 * min(self.code_lengths_length as usize, Self::MAX_CODE_LENGTHS)
-                        {
+                        if index >= array.len() {
                             // prevent an IndexOutOfRangeException from array[index]
                             return Err(InternalErr::DataError); // InvalidHuffmanData
                         }
