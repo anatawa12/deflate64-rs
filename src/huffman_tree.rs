@@ -1,5 +1,6 @@
 use crate::input_buffer::InputBuffer;
 use crate::InternalErr;
+use core::cmp::min;
 
 #[derive(Debug)]
 pub(crate) struct HuffmanTree {
@@ -224,7 +225,7 @@ impl HuffmanTree {
                             avail += 1;
                         }
 
-                        if value > 0 || value <= -(1 << Self::TABLE_BITS) {
+                        if value > 0 {
                             // prevent an IndexOutOfRangeException from array[index]
                             return Err(InternalErr::DataError); // InvalidHuffmanData
                         }
@@ -242,6 +243,13 @@ impl HuffmanTree {
                             array = &mut get!(self.right);
                         }
                         index = -value as usize; // go to next node
+
+                        if index
+                            >= 2 * min(self.code_lengths_length as usize, Self::MAX_CODE_LENGTHS)
+                        {
+                            // prevent an IndexOutOfRangeException from array[index]
+                            return Err(InternalErr::DataError); // InvalidHuffmanData
+                        }
 
                         code_bit_mask <<= 1;
                         overflow_bits -= 1;
