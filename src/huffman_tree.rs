@@ -222,9 +222,7 @@ impl HuffmanTree {
                             array[index] = -avail; // use next available slot.
                             value = -avail;
                             avail += 1;
-                        }
-
-                        if value > 0 {
+                        } else if value > 0 || value <= -(1 << Self::TABLE_BITS) {
                             // prevent an IndexOutOfRangeException from array[index]
                             return Err(InternalErr::DataError); // InvalidHuffmanData
                         }
