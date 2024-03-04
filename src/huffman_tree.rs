@@ -1,6 +1,5 @@
 use crate::input_buffer::InputBuffer;
 use crate::InternalErr;
-use core::cmp::min;
 
 #[derive(Debug)]
 pub(crate) struct HuffmanTree {
