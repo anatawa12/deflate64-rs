@@ -243,6 +243,11 @@ impl HuffmanTree {
                         }
                         index = -value as usize; // go to next node
 
+                        if index >= array.len() {
+                            // prevent an IndexOutOfRangeException from array[index]
+                            return Err(InternalErr::DataError); // InvalidHuffmanData
+                        }
+
                         code_bit_mask <<= 1;
                         overflow_bits -= 1;
 
