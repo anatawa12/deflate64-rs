@@ -93,18 +93,23 @@ jobs:
   publish:
     name: Publish to GitHub
     environment:
-      name: master branch
+      name: actions-github-app
       url: https://github.com/${{ github.repository }}/releases/v${{ needs.pre-build.outputs.version }}
     permissions:
       contents: write
     runs-on: ubuntu-latest
     needs: [publish-crates-io, pre-build]
     steps:
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
       - uses: actions/checkout@v4
         with:
           ref: 'releasing'
           fetch-depth: 2
-          token: ${{ secrets.MASTER_GITHUB_PAT }}
+          token: ${{ steps.app-token.outputs.token }}
 
       # tools
       - uses: anatawa12/something-releaser@v3
