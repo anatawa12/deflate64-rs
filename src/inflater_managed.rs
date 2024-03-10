@@ -33,6 +33,10 @@ static STATIC_DISTANCE_TREE_TABLE: &[u8] = &[
     0x01, 0x11, 0x09, 0x19, 0x05, 0x15, 0x0d, 0x1d, 0x03, 0x13, 0x0b, 0x1b, 0x07, 0x17, 0x0f, 0x1f,
 ];
 
+// source: https://github.com/dotnet/runtime/blob/82dac28143be0740d795f434db9b70f61b3b7a04/src/libraries/System.IO.Compression/src/System/IO/Compression/DeflateManaged/OutputWindow.cs#L17
+const TABLE_LOOKUP_LENGTH_MAX: usize = 65536;
+const TABLE_LOOKUP_DISTANCE_MAX: usize = 65538;
+
 /// The streaming Inflater for deflate64
 ///
 /// This struct has big buffer so It's not recommended to move this struct.
@@ -326,7 +330,7 @@ impl InflaterManaged {
         *end_of_block_code_seen = false;
 
         let mut free_bytes = self.output.free_bytes(); // it is a little bit faster than frequently accessing the property
-        while free_bytes > 65536 {
+        while free_bytes > TABLE_LOOKUP_LENGTH_MAX {
             // With Deflate64 we can have up to a 64kb length, so we ensure at least that much space is available
             // in the OutputWindow to avoid overwriting previous unflushed output data.
 
@@ -410,6 +414,10 @@ impl InflaterManaged {
                             + bits as usize;
                     } else {
                         offset = (self.distance_code + 1) as usize;
+                    }
+
+                    if self.length > TABLE_LOOKUP_LENGTH_MAX || offset > TABLE_LOOKUP_DISTANCE_MAX {
+                        return Err(InternalErr::DataError);
                     }
 
                     self.output.write_length_distance(self.length, offset);
