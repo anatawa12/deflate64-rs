@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog].
 ### Removed
 
 ### Fixed
+- Panic with Invalid Data `#26` `#24`
 
 ### Security
 
