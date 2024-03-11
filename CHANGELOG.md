@@ -16,9 +16,12 @@ The format is based on [Keep a Changelog].
 ### Removed
 
 ### Fixed
-- Panic with Invalid Data `#26` `#24`
 
 ### Security
+
+## [0.1.8] - 2024-03-11
+### Fixed
+- Panic with Invalid Data [`#26`](https://github.com/anatawa12/deflate64-rs/pull/26) [`#24`](https://github.com/anatawa12/deflate64-rs/pull/24)
 
 ## [0.1.7] - 2024-01-27
 ## [0.1.6] - 2023-10-15
@@ -63,7 +66,8 @@ The format is based on [Keep a Changelog].
 ### Added
 - Initial Deflate64 implementation
 
-[Unreleased]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/anatawa12/deflate64-rs/compare/v0.1.4...v0.1.5
