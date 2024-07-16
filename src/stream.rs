@@ -45,6 +45,11 @@ impl<R> Deflate64Decoder<R> {
 
 impl<R: BufRead> Read for Deflate64Decoder<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if buf.is_empty() {
+            // we received empty buffer, so it won't be possible to write anything
+            return Ok(0);
+        }
+
         loop {
             let input = self.inner.fill_buf()?;
             let eof = input.is_empty();
@@ -58,11 +63,6 @@ impl<R: BufRead> Read for Deflate64Decoder<R> {
                     io::ErrorKind::InvalidInput,
                     "invalid deflate64",
                 ));
-            }
-
-            if buf.is_empty() {
-                // we received empty buffer, so it won't be possible to write anything
-                return Ok(0);
             }
 
             if result.bytes_written == 0 && !eof && !self.inflater.finished() {
