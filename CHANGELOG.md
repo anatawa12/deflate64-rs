@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog].
 ### Removed
 
 ### Fixed
+- Infinite loop with empty output buffer in `Deflate64Decoder` [`#30`](https://github.com/anatawa12/deflate64-rs/pull/30)
 
 ### Security
 
