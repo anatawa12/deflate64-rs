@@ -60,7 +60,12 @@ impl<R: BufRead> Read for Deflate64Decoder<R> {
                 ));
             }
 
-            if result.bytes_written == 0 && !eof && !self.inflater.finished() && !buf.is_empty() {
+            if buf.is_empty() {
+                // we received empty buffer, so it won't be possible to write anything
+                return Ok(0);
+            }
+
+            if result.bytes_written == 0 && !eof && !self.inflater.finished() {
                 // if we haven't ready any data and we haven't hit EOF yet,
                 // ask again. We must not return 0 in such case
                 continue;
