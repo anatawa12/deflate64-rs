@@ -31,6 +31,7 @@ impl<'b> Buffer<'b> {
     pub(crate) fn copy_from_slice(&mut self, input: &[u8]) {
         match self {
             Buffer::Uninit(uninit) => {
+                // TODO: replace with write_copy_of_slice when rust-lang/rust#79995 get stabilized.
                 debug_assert_eq!(uninit.len(), input.len());
                 uninit
                     .iter_mut()
