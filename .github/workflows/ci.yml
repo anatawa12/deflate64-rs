@@ -39,7 +39,7 @@ jobs:
 
       - name: Upload proptest regressions
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: proptest-regressions
           path: tests/*.proptest-regressions
