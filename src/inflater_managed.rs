@@ -2,6 +2,8 @@ use crate::buffer::Buffer;
 use crate::huffman_tree::HuffmanTree;
 use crate::input_buffer::{BitsBuffer, InputBuffer};
 use crate::output_window::OutputWindow;
+#[cfg(feature = "checkpoint")]
+use crate::CheckpointStreamPositions;
 use crate::{array_copy, array_copy1, BlockType, InflateResult, InflaterState, InternalErr};
 use std::cmp::min;
 use std::mem::MaybeUninit;
@@ -75,6 +77,18 @@ pub struct InflaterManaged {
     code_length_tree: HuffmanTree,
     uncompressed_size: usize,
     current_inflated_count: usize,
+
+    // Cumulative counters updated once per inflate call
+    total_input_loaded: u64, // total bytes loaded into bit reader, only updated after decode()
+    total_output_consumed: u64, // total bytes already returned to caller
+
+    // Lightweight checkpoint: updated after every write to output window
+    #[cfg(feature = "checkpoint")]
+    checkpoint_input_bits: u64, // exact input bit position of checkpoint
+    #[cfg(feature = "checkpoint")]
+    checkpoint_bit_buffer: u8, // low byte of input bit_buffer (future bits)
+    #[cfg(feature = "checkpoint")]
+    checkpoint_block_type: BlockType, // self.block_type at time checkpoint was taken
 }
 
 impl InflaterManaged {
@@ -114,13 +128,29 @@ impl InflaterManaged {
             distance_tree: HuffmanTree::invalid(),
             length_code: 0,
             current_inflated_count: 0,
+            total_input_loaded: 0,
+            total_output_consumed: 0,
+            #[cfg(feature = "checkpoint")]
+            checkpoint_input_bits: 0,
+            #[cfg(feature = "checkpoint")]
+            checkpoint_bit_buffer: 0,
+            #[cfg(feature = "checkpoint")]
+            checkpoint_block_type: BlockType::Uncompressed,
         }
     }
 
-    /// Returns true if deflating finished
+    /// Returns true if dcompression finished and no more output is available
     ///
     /// This also returns true if this inflater is in error state
     pub fn finished(&self) -> bool {
+        (self.state == InflaterState::Done && self.available_output() == 0)
+            || self.state == InflaterState::DataErrored
+    }
+
+    /// Returns true if decompression finished, but may still have output available in buffer
+    ///
+    /// This also returns true if this inflater is in error state
+    pub fn input_finished(&self) -> bool {
         self.state == InflaterState::Done || self.state == InflaterState::DataErrored
     }
 
@@ -177,6 +207,7 @@ impl InflaterManaged {
             if copied > 0 {
                 output = output.index_mut(copied..);
                 result.bytes_written += copied;
+                self.total_output_consumed += copied as u64;
             }
 
             if output.is_empty() {
@@ -187,7 +218,7 @@ impl InflaterManaged {
             if self.errored() {
                 result.data_error = true;
                 break 'while_loop false;
-            } else if self.finished() {
+            } else if self.input_finished() {
                 break 'while_loop false;
             }
             match self.decode(&mut input) {
@@ -202,6 +233,7 @@ impl InflaterManaged {
         } {}
 
         self.bits = input.bits;
+        self.total_input_loaded += input.read_bytes as u64;
         result.bytes_consumed = input.read_bytes;
         result
     }
@@ -212,7 +244,7 @@ impl InflaterManaged {
 
         if self.errored() {
             return Err(InternalErr::DataError);
-        } else if self.finished() {
+        } else if self.input_finished() {
             return Ok(());
         }
 
@@ -313,6 +345,7 @@ impl InflaterManaged {
                     // Directly copy bytes from input to output.
                     let bytes_copied = self.output.copy_from(input, self.block_length);
                     self.block_length -= bytes_copied;
+                    self.update_checkpoint_after_write(input);
 
                     if self.block_length == 0 {
                         // Done with this block, need to re-init bit buffer for next block
@@ -362,6 +395,7 @@ impl InflaterManaged {
                         // literal
                         self.output.write(symbol as u8);
                         free_bytes -= 1;
+                        self.update_checkpoint_after_write(input);
                     } else if symbol == 256 {
                         // end of block
                         *end_of_block_code_seen = true;
@@ -438,6 +472,7 @@ impl InflaterManaged {
                     self.output.write_length_distance(self.length, offset);
                     free_bytes -= self.length;
                     self.state = InflaterState::DecodeTop;
+                    self.update_checkpoint_after_write(input);
                 }
 
                 _ => {
@@ -636,5 +671,211 @@ impl InflaterManaged {
             .new_in_place(&distance_tree_code_length)?;
         self.state = InflaterState::DecodeTop;
         Ok(())
+    }
+
+    #[inline]
+    #[allow(unused_variables)]
+    fn update_checkpoint_after_write(&mut self, input: &InputBuffer<'_>) {
+        #[cfg(feature = "checkpoint")]
+        {
+            debug_assert!(input.bits.bits_in_buffer >= 0 && input.bits.bits_in_buffer <= 32);
+            self.checkpoint_input_bits = (self.total_input_loaded + input.read_bytes as u64) * 8
+                - input.bits.bits_in_buffer as u64;
+            self.checkpoint_bit_buffer = input.bits.bit_buffer as u8;
+            self.checkpoint_block_type = self.block_type;
+        }
+    }
+
+    #[cfg(feature = "checkpoint")]
+    fn fletcher32_checksum(data: &[u8]) -> u32 {
+        let (mut a, mut b) = (0u32, 0u32);
+        for &byte in data {
+            a = a.wrapping_add(byte as u32);
+            b = b.wrapping_add(a);
+        }
+        (b << 16) | (a & 0xFFFF)
+    }
+
+    /// Checkpoints current inflater state (~65KB, or available_output() + ~1KB if larger).
+    /// Use with restore_from_checkpoint() to resume decompression without reprocessing from the beginning.
+    #[cfg(feature = "checkpoint")]
+    pub fn checkpoint(&self) -> Option<(Vec<u8>, CheckpointStreamPositions)> {
+        if self.checkpoint_input_bits == 0
+            || self.errored()
+            || (self.output.available_bytes() == 0 && self.state == InflaterState::Done)
+        {
+            return None;
+        }
+
+        let uncompressed_remaining = match self.checkpoint_block_type {
+            BlockType::Uncompressed => self.block_length as u32,
+            _ => 0,
+        };
+
+        let mut lit_codes = [0xFFu8; HuffmanTree::MAX_LITERAL_TREE_ELEMENTS];
+        let mut dist_codes = [0xFFu8; HuffmanTree::MAX_DIST_TREE_ELEMENTS];
+        if self.checkpoint_block_type == BlockType::Dynamic {
+            let lens = self.literal_length_tree.code_lengths();
+            lit_codes[..lens.len()].copy_from_slice(lens);
+            let lens = self.distance_tree.code_lengths();
+            dist_codes[..lens.len()].copy_from_slice(lens);
+        }
+
+        // window data slices may be split due to circular buffer
+        let output_bytes_written =
+            self.total_output_consumed + self.output.available_bytes() as u64;
+        let bytes_unread = self.output.available_bytes() as u32;
+        let (window_a, window_b) = self.output.get_checkpoint_data(output_bytes_written);
+
+        let bfinal_block_type =
+            self.checkpoint_block_type as u8 | (self.bfinal as u8).wrapping_shl(7);
+
+        const MASKS_BY_REMAINDER: [u8; 8] = [0x00, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01];
+        let lookup = (self.checkpoint_input_bits % 8) as usize;
+        let buffered_value_byte = self.checkpoint_bit_buffer & MASKS_BY_REMAINDER[lookup];
+
+        // 8 + 1 + 1 + 4 + 288 + 32 + 8 + 4 = 346 bytes, then window data
+        let mut out = Vec::with_capacity(346 + window_a.len() + window_b.len());
+        out.extend_from_slice(&self.checkpoint_input_bits.to_le_bytes()); // 8
+        out.push(buffered_value_byte); // 1
+        out.push(bfinal_block_type); // 1
+        out.extend_from_slice(&uncompressed_remaining.to_le_bytes()); // 4
+        out.extend_from_slice(&lit_codes); // 288
+        out.extend_from_slice(&dist_codes); // 32
+        out.extend_from_slice(&output_bytes_written.to_le_bytes()); // 8
+        out.extend_from_slice(&bytes_unread.to_le_bytes()); // 4
+        debug_assert_eq!(out.len(), 346);
+        out.extend_from_slice(window_a);
+        out.extend_from_slice(window_b);
+        let checksum = Self::fletcher32_checksum(&out);
+        out.extend_from_slice(&checksum.to_le_bytes());
+
+        let positions = CheckpointStreamPositions {
+            // round up; partial input byte is alreeady stored in checkpoint
+            input_bytes_to_skip: self.checkpoint_input_bits.div_ceil(8),
+            output_bytes_already_returned: output_bytes_written - bytes_unread as u64,
+        };
+        Some((out, positions))
+    }
+
+    /// Restore inflater state from a previous checkpoint. Returns byte offsets
+    /// that caller must use to skip forward in input and output data streams before
+    /// calling inflate(). The existing state of this inflater will be overwritten.
+    /// Exception: explicit output size set by with_uncompressed_size will be retained.
+    #[cfg(feature = "checkpoint")]
+    #[must_use]
+    pub fn restore_from_checkpoint(
+        &mut self,
+        checkpoint_data: &[u8],
+    ) -> Option<CheckpointStreamPositions> {
+        if checkpoint_data.len() < 4 {
+            return None;
+        }
+        let (data, checksum_bytes) = checkpoint_data.split_at(checkpoint_data.len() - 4);
+        let stored_checksum = u32::from_le_bytes(checksum_bytes.try_into().ok()?);
+        if Self::fletcher32_checksum(data) != stored_checksum {
+            return None;
+        }
+        let mut cursor = data;
+        let mut read = |n: usize| -> Option<&[u8]> {
+            if cursor.len() < n {
+                return None;
+            }
+            let (head, tail) = cursor.split_at(n);
+            cursor = tail;
+            Some(head)
+        };
+
+        // Parse all fields
+        let input_bits: u64 = u64::from_le_bytes(read(8)?.try_into().ok()?);
+        let buffered_value: u8 = read(1)?[0];
+        let bfinal_block_type: u8 = read(1)?[0];
+        let remaining_uncompressed: u32 = u32::from_le_bytes(read(4)?.try_into().ok()?);
+        let lit_codes: &[u8] = read(HuffmanTree::MAX_LITERAL_TREE_ELEMENTS)?;
+        let dist_codes: &[u8] = read(HuffmanTree::MAX_DIST_TREE_ELEMENTS)?;
+        let output_bytes_written: u64 = u64::from_le_bytes(read(8)?.try_into().ok()?);
+        let output_bytes_unread: u32 = u32::from_le_bytes(read(4)?.try_into().ok()?);
+        let window_data: &[u8] = cursor; // remaining bytes
+
+        // Mask to keep only valid bits not yet consumed from buffered byte (0-7 bits)
+        const MASKS_BY_REMAINDER: [u8; 8] = [0x00, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01];
+        let low_bit_mask = MASKS_BY_REMAINDER[input_bits as usize & 7];
+        let bits = BitsBuffer {
+            bit_buffer: (buffered_value & low_bit_mask) as u32,
+            bits_in_buffer: low_bit_mask.trailing_ones() as i32,
+        };
+
+        let expected_window_len = (output_bytes_written.min(TABLE_LOOKUP_DISTANCE_MAX as u64)
+            as u32)
+            .max(output_bytes_unread) as usize;
+        if window_data.len() != expected_window_len
+            || window_data.len() > crate::output_window::WINDOW_SIZE
+        {
+            return None;
+        }
+
+        let bfinal = (bfinal_block_type & 128) != 0;
+        let block_type_val = bfinal_block_type % 128;
+        let block_type = BlockType::from_int(block_type_val.into())?;
+
+        let mut lit_tree = HuffmanTree::invalid();
+        let mut dist_tree = HuffmanTree::invalid();
+        if block_type == BlockType::Dynamic {
+            let lit_count = lit_codes
+                .iter()
+                .position(|&x| x == 0xFF)
+                .unwrap_or(HuffmanTree::MAX_LITERAL_TREE_ELEMENTS);
+            let dist_count = dist_codes
+                .iter()
+                .position(|&x| x == 0xFF)
+                .unwrap_or(HuffmanTree::MAX_DIST_TREE_ELEMENTS);
+            lit_tree.new_in_place(&lit_codes[..lit_count]).ok()?;
+            dist_tree.new_in_place(&dist_codes[..dist_count]).ok()?;
+        }
+
+        // All validation passed - modify self
+        // Pre-load buffered bits into bit buffer
+        self.bits = bits;
+        self.checkpoint_input_bits = input_bits;
+        self.checkpoint_bit_buffer = buffered_value;
+        self.total_output_consumed = output_bytes_written - output_bytes_unread as u64;
+        self.current_inflated_count = self.total_output_consumed as usize;
+        self.total_input_loaded = input_bits.div_ceil(8); // caller will provide input starting at input_bytes_to_skip
+
+        self.output.restore_from_checkpoint(
+            window_data,
+            (output_bytes_written as usize) % crate::output_window::WINDOW_SIZE,
+            output_bytes_unread as usize,
+        );
+
+        self.checkpoint_block_type = block_type;
+        match block_type {
+            BlockType::Uncompressed => {
+                self.state = InflaterState::DecodingUncompressed;
+                self.bfinal = bfinal;
+                self.block_type = BlockType::Uncompressed;
+                self.block_length = remaining_uncompressed as usize;
+            }
+            BlockType::Static => {
+                self.state = InflaterState::DecodeTop;
+                self.bfinal = bfinal;
+                self.block_type = BlockType::Static;
+                self.literal_length_tree = HuffmanTree::static_literal_length_tree();
+                self.distance_tree = HuffmanTree::static_distance_tree();
+            }
+            BlockType::Dynamic => {
+                self.state = InflaterState::DecodeTop;
+                self.bfinal = bfinal;
+                self.block_type = BlockType::Dynamic;
+                self.literal_length_tree = lit_tree;
+                self.distance_tree = dist_tree;
+            }
+        }
+
+        Some(CheckpointStreamPositions {
+            // round up; partial input byte is alreeady stored in checkpoint
+            input_bytes_to_skip: input_bits.div_ceil(8),
+            output_bytes_already_returned: output_bytes_written - output_bytes_unread as u64,
+        })
     }
 }

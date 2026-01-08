@@ -125,6 +125,16 @@ impl InflateResult {
     }
 }
 
+/// Result of restoring from a checkpoint.
+#[cfg(feature = "checkpoint")]
+#[derive(Debug, PartialEq, Eq)]
+pub struct CheckpointStreamPositions {
+    /// Count of input bytes already consumed before checkpoint.
+    pub input_bytes_to_skip: u64,
+    /// Count of output bytes already returned before checkpoint.
+    pub output_bytes_already_returned: u64,
+}
+
 #[derive(Debug)]
 enum InternalErr {
     DataNeeded,

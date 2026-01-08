@@ -3,8 +3,8 @@ use std::cmp::min;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct BitsBuffer {
-    bit_buffer: u32,
-    bits_in_buffer: i32,
+    pub(crate) bit_buffer: u32,
+    pub(crate) bits_in_buffer: i32,
 }
 
 impl BitsBuffer {
@@ -16,6 +16,7 @@ impl BitsBuffer {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct InputBuffer<'a> {
     pub bits: BitsBuffer,
     pub buffer: &'a [u8],

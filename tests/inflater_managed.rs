@@ -94,3 +94,25 @@ fn binary_wav_shredded(chunk: usize) {
         BINARY_WAV_DATA
     );
 }
+
+#[test]
+fn not_finished_until_drained() {
+    // This is a hand-constructed DEFLATE64 bitstream using static Huffman tables,
+    // 1 literal zero + 2x max-length matches (65536 each) = output 131073 zero bytes
+    let input: &[u8] = &[0x63, 0x18, 0xed, 0xff, 0x07, 0xa3, 0xfd, 0xff, 0x00, 0x00];
+    let expected_len = 1 + 65536 + 65536;
+
+    let mut inflater = InflaterManaged::new();
+    let mut output = vec![0xFFu8; expected_len + 100];
+
+    let result1 = inflater.inflate(input, &mut output[0..1]);
+    assert!(inflater.input_finished() && !inflater.finished());
+    assert_eq!(result1.bytes_consumed, input.len());
+    assert_eq!(result1.bytes_written, 1);
+
+    let result2 = inflater.inflate(&[], &mut output[1..]);
+    assert_eq!(result2.bytes_written, expected_len - 1);
+    assert!(output[..expected_len].iter().all(|&b| b == 0));
+
+    assert!(inflater.finished() && !inflater.errored());
+}
