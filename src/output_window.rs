@@ -4,7 +4,7 @@ use std::cmp::min;
 // With Deflate64 we can have up to a 65536 length as well as up to a 65538 distance. This means we need a Window that is at
 // least 131074 bytes long so we have space to retrieve up to a full 64kb in look-back and place it in our buffer without
 // overwriting existing data. OutputWindow requires that the WINDOW_SIZE be an exponent of 2, so we round up to 2^18.
-const WINDOW_SIZE: usize = 262144;
+pub(crate) const WINDOW_SIZE: usize = 262144;
 const WINDOW_MASK: usize = 262143;
 
 /// <summary>
@@ -164,5 +164,40 @@ impl OutputWindow {
         self.bytes_used -= copied;
         //debug_assert!(self.bytes_used >= 0, "check this function and find why we copied more bytes than we have");
         copied
+    }
+
+    #[cfg(feature = "checkpoint")]
+    pub(crate) fn get_checkpoint_data(&self, total_output_written: u64) -> (&[u8], &[u8]) {
+        const MAX_HISTORY_DISTANCE: usize = 65538;
+        let history_needed = min(MAX_HISTORY_DISTANCE, total_output_written as usize);
+        let data_len = history_needed.max(self.bytes_used);
+        let start = (self.end + WINDOW_SIZE - data_len) & WINDOW_MASK;
+        if data_len <= WINDOW_SIZE - start {
+            // one contiguous range
+            (&self.window[start..start + data_len], &[])
+        } else {
+            // wrap around, two ranges
+            (&self.window[start..], &self.window[..self.end])
+        }
+    }
+
+    #[cfg(feature = "checkpoint")]
+    pub(crate) fn restore_from_checkpoint(
+        &mut self,
+        data: &[u8],
+        end_pos: usize,
+        bytes_used: usize,
+    ) {
+        self.end = end_pos & WINDOW_MASK;
+        self.bytes_used = bytes_used;
+
+        let start = (self.end + WINDOW_SIZE - data.len()) & WINDOW_MASK;
+        if start + data.len() <= WINDOW_SIZE {
+            self.window[start..start + data.len()].copy_from_slice(data);
+        } else {
+            let first_part = WINDOW_SIZE - start;
+            self.window[start..].copy_from_slice(&data[..first_part]);
+            self.window[..data.len() - first_part].copy_from_slice(&data[first_part..]);
+        }
     }
 }

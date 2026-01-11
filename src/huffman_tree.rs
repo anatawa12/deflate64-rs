@@ -131,9 +131,14 @@ impl HuffmanTree {
         new_code >> 1
     }
 
-    fn calculate_huffman_code(&self) -> [u32; Self::MAX_LITERAL_TREE_ELEMENTS] {
+    fn calculate_huffman_code(
+        &self,
+    ) -> Result<[u32; Self::MAX_LITERAL_TREE_ELEMENTS], InternalErr> {
         let mut bit_length_count = [0u32; 17];
         for &code_length in get!(self.code_length_array).iter() {
+            if code_length > 16 {
+                return Err(InternalErr::DataError);
+            }
             bit_length_count[code_length as usize] += 1;
         }
         bit_length_count[0] = 0; // clear count for length 0
@@ -154,11 +159,11 @@ impl HuffmanTree {
             }
         }
 
-        code
+        Ok(code)
     }
 
     fn create_table(&mut self) -> Result<(), InternalErr> {
-        let code_array = self.calculate_huffman_code();
+        let code_array = self.calculate_huffman_code()?;
 
         let mut avail = get!(self.code_length_array).len() as i16;
 
@@ -313,5 +318,45 @@ impl HuffmanTree {
 
         input.skip_bits(code_length);
         Ok(symbol as u16)
+    }
+
+    #[allow(dead_code)]
+    pub fn code_lengths(&self) -> &[u8] {
+        &self.code_length_array[..self.code_lengths_length as usize]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    #[test]
+    fn static_trees_construct() {
+        assert_eq!(
+            HuffmanTree::static_literal_length_tree().code_lengths_length,
+            288
+        );
+        assert_eq!(HuffmanTree::static_distance_tree().code_lengths_length, 32);
+    }
+
+    proptest! {
+        #[test]
+        fn construction_never_panics_literal(lengths in prop::collection::vec(0u8..=255, 288)) {
+            let arr: [u8; 288] = lengths.try_into().unwrap();
+            let _ = HuffmanTree::new(&arr);
+        }
+
+        #[test]
+        fn construction_never_panics_distance(lengths in prop::collection::vec(0u8..=255, 32)) {
+            let arr: [u8; 32] = lengths.try_into().unwrap();
+            let _ = HuffmanTree::new(&arr);
+        }
+
+        #[test]
+        fn construction_never_panics_code_length(lengths in prop::collection::vec(0u8..=255, 19)) {
+            let arr: [u8; 19] = lengths.try_into().unwrap();
+            let _ = HuffmanTree::new(&arr);
+        }
     }
 }
