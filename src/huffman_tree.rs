@@ -311,4 +311,9 @@ impl HuffmanTree {
         input.skip_bits(code_length);
         Ok(symbol)
     }
+
+    #[allow(dead_code)]
+    pub fn code_lengths(&self) -> &[u8] {
+        &self.code_length_array[..self.code_lengths_length as usize]
+    }
 }

@@ -6,7 +6,7 @@ use std::cmp::min;
 // 65536 "free" bytes available for the maximum possible write length. However, it is OK if the free bytes
 // overlap the history window; we process length-distance match copies in the forward direction. It is fine
 // to wrap around and overwrite bytes that we have already copied forward.
-const WINDOW_SIZE: usize = 131072;
+pub(crate) const WINDOW_SIZE: usize = 131072;
 const WINDOW_MASK: usize = 131071;
 
 /// <summary>
@@ -150,5 +150,27 @@ impl OutputWindow {
         self.bytes_used -= copied;
         //debug_assert!(self.bytes_used >= 0, "check this function and find why we copied more bytes than we have");
         copied
+    }
+
+    #[cfg(feature = "checkpoint")]
+    pub(crate) fn get_checkpoint_data(&self, total_output_written: u64) -> (&[u8], &[u8]) {
+        const MAX_HISTORY_DISTANCE: usize = 65538;
+        let history_needed = min(MAX_HISTORY_DISTANCE, total_output_written as usize);
+        let data_len = history_needed.max(self.bytes_used);
+        let start = (self.end + WINDOW_SIZE - data_len) & WINDOW_MASK;
+        if data_len <= WINDOW_SIZE - start {
+            // one contiguous range
+            (&self.window[start..start + data_len], &[])
+        } else {
+            // wrap around, two ranges
+            (&self.window[start..], &self.window[..self.end])
+        }
+    }
+
+    #[cfg(feature = "checkpoint")]
+    pub(crate) fn restore_from_checkpoint(&mut self, data: &[u8], bytes_used: usize) {
+        self.window[..data.len()].copy_from_slice(data);
+        self.end = data.len();
+        self.bytes_used = bytes_used;
     }
 }
