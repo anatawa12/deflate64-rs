@@ -17,6 +17,8 @@ mod stream;
 
 pub use inflater_managed::InflaterManaged;
 pub use stream::Deflate64Decoder;
+#[cfg(feature = "checkpoint")]
+pub use inflater_managed::checkpoint;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum BlockType {
