@@ -1,6 +1,6 @@
 #![cfg(feature = "checkpoint")]
 
-use deflate64::{CheckpointStreamPositions, InflaterManaged};
+use deflate64::{checkpoint::CheckpointStreamPositions, InflaterManaged};
 
 const BINARY_WAV_DATA_OFFSET: usize = 40;
 const BINARY_WAV_COMPRESSED_SIZE: usize = 2669743;

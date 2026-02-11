@@ -15,10 +15,10 @@ mod input_buffer;
 mod output_window;
 mod stream;
 
-pub use inflater_managed::InflaterManaged;
-pub use stream::Deflate64Decoder;
 #[cfg(feature = "checkpoint")]
 pub use inflater_managed::checkpoint;
+pub use inflater_managed::InflaterManaged;
+pub use stream::Deflate64Decoder;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum BlockType {
@@ -126,17 +126,6 @@ impl InflateResult {
             data_error: false,
         }
     }
-}
-
-/// Input and output stream positions corresponding to an inflater checkpoint.
-#[cfg(feature = "checkpoint")]
-#[cfg_attr(docsrs, doc(cfg(feature = "checkpoint")))]
-#[derive(Debug, PartialEq, Eq)]
-pub struct CheckpointStreamPositions {
-    /// Count of input bytes already consumed before checkpoint.
-    pub input_bytes_to_skip: u64,
-    /// Count of output bytes already returned before checkpoint.
-    pub output_bytes_already_returned: u64,
 }
 
 #[derive(Debug)]

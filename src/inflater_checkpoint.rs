@@ -65,7 +65,7 @@
 
 use crate::huffman_tree::HuffmanTree;
 use crate::input_buffer::{BitsBuffer, InputBuffer};
-use crate::{BlockType, CheckpointStreamPositions, InflaterState};
+use crate::{BlockType, InflaterState};
 
 use super::{InflaterManaged, TABLE_LOOKUP_DISTANCE_MAX};
 
@@ -334,4 +334,13 @@ impl InflaterManaged {
             output_bytes_already_returned: output_bytes_written - output_bytes_unread as u64,
         })
     }
+}
+
+/// Input and output stream positions corresponding to an inflater checkpoint.
+#[derive(Debug, PartialEq, Eq)]
+pub struct CheckpointStreamPositions {
+    /// Count of input bytes already consumed before checkpoint.
+    pub input_bytes_to_skip: u64,
+    /// Count of output bytes already returned before checkpoint.
+    pub output_bytes_already_returned: u64,
 }
