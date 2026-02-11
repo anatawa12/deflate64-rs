@@ -37,7 +37,7 @@
 //! ```
 //!
 //! To restore from a checkpoint, call `restore_from_checkpoint()` and seek both
-//! streams to the positions indicated by the returned `CheckpointStreamPositions`:
+//! streams to the positions indicated by the returned [`CheckpointStreamPositions`](CheckpointStreamPositions):
 //!
 //! ```ignore
 //! let mut inflater = InflaterManaged::new();
