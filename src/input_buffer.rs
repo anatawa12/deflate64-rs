@@ -3,8 +3,8 @@ use std::cmp::min;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct BitsBuffer {
-    bit_buffer: u32,
-    bits_in_buffer: i32,
+    pub(crate) bit_buffer: u32,
+    pub(crate) bits_in_buffer: i32,
 }
 
 impl BitsBuffer {
@@ -12,6 +12,16 @@ impl BitsBuffer {
         Self {
             bit_buffer: 0,
             bits_in_buffer: 0,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn from_bits(bits: u32, num_bits: i32) -> BitsBuffer {
+        debug_assert!((0..=32).contains(&num_bits));
+        let mask = (!0u32).unbounded_shr(num_bits as u32);
+        Self {
+            bit_buffer: bits & mask,
+            bits_in_buffer: num_bits,
         }
     }
 }
@@ -33,6 +43,11 @@ impl<'a> InputBuffer<'a> {
 
     pub fn available_bits(&self) -> i32 {
         self.bits.bits_in_buffer
+    }
+
+    #[allow(dead_code)]
+    pub fn peek_available_bits(&self) -> u32 {
+        self.bits.bit_buffer
     }
 
     pub fn available_bytes(&self) -> usize {

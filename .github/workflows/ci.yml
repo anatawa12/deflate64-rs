@@ -28,6 +28,11 @@ jobs:
       - name: Run tests
         run: cargo test --verbose --all-features
 
+      - name: Build without default features
+        run: cargo build --verbose --no-default-features
+      - name: Run tests without default features
+        run: cargo test --verbose --no-default-features
+
       - name: Test release build with debug assertions
         run: cargo test --release --all-features
         env:
@@ -35,7 +40,9 @@ jobs:
           CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: true
 
       - name: Test release build without debug assertions
-        run: cargo test --release --all-features -- --include-ignored
+        run: cargo test --release --all-features
+      - name: Test p7zip compatibility
+        run: cargo test --release --all-features --test 7zip* -- --ignored
 
       - name: Upload proptest regressions
         if: failure()

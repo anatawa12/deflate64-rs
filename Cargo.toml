@@ -19,6 +19,8 @@ exclude = [
 ]
 
 [features]
+default = []
+checkpoint = []
 
 [dependencies]
 
@@ -30,3 +32,7 @@ tempfile = "3.7.1"
 [[bench]]
 name = "inflate"
 harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

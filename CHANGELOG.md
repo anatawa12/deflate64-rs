@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog].
 
 ## [Unreleased]
 ### Added
+- Checkpoint feature for partial-progress restoration [`#40`](https://github.com/anatawa12/deflate64-rs/pull/40)
 - test: `cargo bench` simple benchmark
 
 ### Changed
