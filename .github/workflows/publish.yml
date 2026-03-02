@@ -130,7 +130,7 @@ jobs:
           git push -u origin master
 
       - name: download release note for this release
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         id: download-release-note
         with:
           name: release-note
