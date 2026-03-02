@@ -71,6 +71,13 @@ impl<R: BufRead> Read for Deflate64Decoder<R> {
                 continue;
             }
 
+            if eof && !self.inflater.finished() {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "unexpected EOF: truncated deflate64 stream",
+                ));
+            }
+
             return Ok(result.bytes_written);
         }
     }

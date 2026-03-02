@@ -36,7 +36,7 @@ static STATIC_DISTANCE_TREE_TABLE: [u8; 32] = [
 ];
 
 // source: https://github.com/dotnet/runtime/blob/82dac28143be0740d795f434db9b70f61b3b7a04/src/libraries/System.IO.Compression/src/System/IO/Compression/DeflateManaged/OutputWindow.cs#L17
-const TABLE_LOOKUP_LENGTH_MAX: usize = 65536;
+const TABLE_LOOKUP_LENGTH_MAX: usize = 65538;
 pub(crate) const TABLE_LOOKUP_DISTANCE_MAX: usize = 65538;
 
 /// The streaming Inflater for deflate64
@@ -530,7 +530,9 @@ impl InflaterManaged {
             //  16 bits for match length "extra bits"
             //  16 bits for distance symbol
             //  16 bits for distance "extra bits"
-            if self.output.free_bytes() < TABLE_LOOKUP_LENGTH_MAX || input.available_bytes() < 8 {
+            // Use `input.buffer.len()` instead of `input.available_bytes()` to guarantee
+            // we have physical slice bytes available for `load_16bits_assume_input()` to consume.
+            if self.output.free_bytes() < TABLE_LOOKUP_LENGTH_MAX || input.buffer.len() < 8 {
                 return Ok((initial_free - self.output.free_bytes(), false));
             }
 
