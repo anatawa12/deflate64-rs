@@ -1,4 +1,3 @@
-
 // unexpected error with 65538 match length
 // (previous version limits 65536 but actually 65538)
 
