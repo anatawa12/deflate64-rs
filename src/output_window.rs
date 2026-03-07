@@ -154,8 +154,8 @@ impl OutputWindow {
 
     #[cfg(feature = "checkpoint")]
     pub(crate) fn get_checkpoint_data(&self, total_output_written: u64) -> (&[u8], &[u8]) {
-        const MAX_HISTORY_DISTANCE: usize = 65538;
-        let history_needed = min(MAX_HISTORY_DISTANCE, total_output_written as usize);
+        use crate::inflater_managed::TABLE_LOOKUP_DISTANCE_MAX;
+        let history_needed = min(TABLE_LOOKUP_DISTANCE_MAX, total_output_written as usize);
         let data_len = history_needed.max(self.bytes_used);
         let start = (self.end + WINDOW_SIZE - data_len) & WINDOW_MASK;
         if data_len <= WINDOW_SIZE - start {

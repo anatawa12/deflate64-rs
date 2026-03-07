@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog].
 ### Removed
 
 ### Fixed
+- Unexpected errors with long window size `#46`
 
 ### Security
 

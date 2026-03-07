@@ -36,8 +36,15 @@ static STATIC_DISTANCE_TREE_TABLE: [u8; 32] = [
 ];
 
 // source: https://github.com/dotnet/runtime/blob/82dac28143be0740d795f434db9b70f61b3b7a04/src/libraries/System.IO.Compression/src/System/IO/Compression/DeflateManaged/OutputWindow.cs#L17
-const TABLE_LOOKUP_LENGTH_MAX: usize = 65536;
-pub(crate) const TABLE_LOOKUP_DISTANCE_MAX: usize = 65538;
+// Note: the upstream comment says "65536 length as well as up to a 65538 distance", but actually
+//       it looks limit is 65538 length with 65538 distance.
+//       There is no mention for length / distance limit in [APPNOTE.TXT] so it's hard to know
+//       which is correct, but 65538 length with 65538 distance is much reasonable since
+//       original deflate have (2^8-1)+3 length with 2^15 distance, and
+//       65538 is (2^16-1)+3 and 65536 is 2^15.
+// [APPNOTE.TXT]: https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+const TABLE_LOOKUP_LENGTH_MAX: usize = 65538;
+pub(crate) const TABLE_LOOKUP_DISTANCE_MAX: usize = 65536;
 
 /// The streaming Inflater for deflate64
 ///

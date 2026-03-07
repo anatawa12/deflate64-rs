@@ -284,21 +284,21 @@ fn checkpoint_uncompressed_block() {
 fn checkpoint_with_large_unread_buffer() {
     const MAX_HISTORY: usize = 65538; // deflate64 back-reference window
 
-    // Hand-built: literal 0, static block [ match 65535 dist 1, match 65536 dist 1 (x3), end ]
-    const DEFLATE64_ZERO_256KB: [u8; 17] = [
-        0x63, 0x18, 0xe5, 0xff, 0x07, 0xa3, 0xfd, 0xff, 0x60, 0xb4, 0xff, 0x1f, 0x8c, 0xf6, 0xff,
-        0x03, 0x00,
+    // Hand-built: literal 0, literal 0, static block [ match 65535 dist 1, match 65536 dist 1 (x3), end ]
+    const DEFLATE64_ZERO_256KB: [u8; 18] = [
+        0x63, 0x60, 0x18, 0xfd, 0xff, 0x07, 0xa3, 0xfd, 0xff, 0x60, 0xb4, 0xff, 0x1f, 0x8c, 0xf6,
+        0xff, 0x03, 0x00,
     ];
 
     // Fill internal inflater buffer
     let mut inflater = InflaterManaged::new();
-    let mut output = [0xff; 100];
+    let mut output = [0xff; 1];
     let _ = inflater.inflate(&DEFLATE64_ZERO_256KB, &mut output);
     assert!(!inflater.finished());
     assert!(output.iter().all(|&x| x == 0));
 
     let avail_before = inflater.available_output();
-    assert!(avail_before > MAX_HISTORY);
+    assert!(avail_before > MAX_HISTORY, "{avail_before} > {MAX_HISTORY}");
 
     let (cp, _) = inflater.checkpoint().unwrap();
     assert!(cp.len() > 346 + MAX_HISTORY);
