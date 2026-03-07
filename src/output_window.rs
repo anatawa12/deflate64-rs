@@ -1,5 +1,6 @@
 use crate::{buffer::Buffer, input_buffer::InputBuffer};
 use std::cmp::min;
+use crate::inflater_managed::TABLE_LOOKUP_DISTANCE_MAX;
 
 // With Deflate64 we can have up to a 65536 length as well as up to a 65538 distance. We need a power-of-two
 // window size that goes back at least 65538 bytes, and we can only write into it when there are at least
@@ -154,8 +155,7 @@ impl OutputWindow {
 
     #[cfg(feature = "checkpoint")]
     pub(crate) fn get_checkpoint_data(&self, total_output_written: u64) -> (&[u8], &[u8]) {
-        const MAX_HISTORY_DISTANCE: usize = 65538;
-        let history_needed = min(MAX_HISTORY_DISTANCE, total_output_written as usize);
+        let history_needed = min(TABLE_LOOKUP_DISTANCE_MAX, total_output_written as usize);
         let data_len = history_needed.max(self.bytes_used);
         let start = (self.end + WINDOW_SIZE - data_len) & WINDOW_MASK;
         if data_len <= WINDOW_SIZE - start {
