@@ -2,6 +2,7 @@
 name = "deflate64"
 version = "0.1.13-SNAPSHOT"
 edition = "2021"
+rust-version = "1.93.0"
 
 license = "MIT"
 authors = ["anatawa12 <anatawa12@icloud.com>"]
